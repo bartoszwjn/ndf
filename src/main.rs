@@ -1,9 +1,13 @@
-use std::{error::Error, process::ExitCode};
+use std::process::ExitCode;
 
 use clap::Parser as _;
 use cli::Cli;
+use items::{Item, ItemPair};
 
 mod cli;
+mod command;
+mod items;
+mod nix;
 
 fn main() -> ExitCode {
     let args = Cli::parse();
@@ -16,9 +20,18 @@ fn main() -> ExitCode {
     }
 }
 
-type Result<T, E = Box<dyn Error>> = std::result::Result<T, E>;
+fn run(args: Cli) -> anyhow::Result<()> {
+    let items = ItemPair::from_args(args)?;
 
-fn run(args: Cli) -> Result<()> {
-    println!("{:#?}", args);
+    for pair in items.iter() {
+        fn format_item(item: &Item) -> String {
+            format!(
+                "src: {:?}, attr: {:?}, ref: {:?}",
+                item.source, item.attr_path, item.git_ref
+            )
+        }
+        println!("- {}\n  {}", format_item(&pair.old), format_item(&pair.new));
+    }
+
     Ok(())
 }
