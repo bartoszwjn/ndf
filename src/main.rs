@@ -10,6 +10,7 @@ use items::ItemPair;
 mod cli;
 mod color;
 mod command;
+mod git;
 mod items;
 mod nix;
 

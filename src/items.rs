@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::{
     cli::Cli,
     color::{BLUE, CYAN, GREEN, GREEN_BOLD, MAGENTA, RED_BOLD, YELLOW},
-    nix,
+    git, nix,
 };
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -16,7 +16,7 @@ pub(crate) struct ItemPair {
 pub(crate) struct Item {
     pub(crate) source: SourceType,
     pub(crate) attr_path: String,
-    pub(crate) git_ref: GitRef,
+    pub(crate) git_rev: GitRev,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -28,6 +28,12 @@ pub(crate) enum SourceType {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum GitRef {
     Ref(String),
+    Worktree,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum GitRev {
+    Rev { orig_ref: String, rev: String },
     Worktree,
 }
 
@@ -46,30 +52,39 @@ impl ItemPair {
             args.paths
         };
 
+        let common_lhs = match args.lhs {
+            Some(lhs) => {
+                let (source, attr_path) = parse_path(lhs, &args.file, args.nixos);
+                let rev = old_ref.resolve(&source)?;
+                Some(Item::new(source, attr_path, rev))
+            }
+            None => None,
+        };
+
         let items = paths
             .into_iter()
             .map(|path| parse_path(path, &args.file, args.nixos))
-            .map(|(source, attr_path)| {
-                let (lhs_source, lhs_attr_path) = match &args.lhs {
-                    Some(lhs) => parse_path(lhs.clone(), &args.file, args.nixos),
-                    None => (source.clone(), attr_path.clone()),
+            .map(|(source, attr_path)| -> anyhow::Result<_> {
+                let lhs = match &common_lhs {
+                    Some(lhs) => lhs.clone(),
+                    None => Item::new(source.clone(), attr_path.clone(), old_ref.resolve(&source)?),
                 };
-                let lhs = Item::new(lhs_source, lhs_attr_path, old_ref.clone());
-                let rhs = Item::new(source, attr_path, new_ref.clone());
-                ItemPair::new(lhs, rhs)
+                let rhs_rev = new_ref.resolve(&source)?;
+                let rhs = Item::new(source, attr_path, rhs_rev);
+                Ok(ItemPair::new(lhs, rhs))
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         Ok(items)
     }
 }
 
 impl Item {
-    fn new(source: SourceType, attr_path: String, git_ref: GitRef) -> Self {
+    fn new(source: SourceType, attr_path: String, git_rev: GitRev) -> Self {
         Self {
             source,
             attr_path,
-            git_ref,
+            git_rev,
         }
     }
 }
@@ -87,6 +102,21 @@ impl GitRef {
         match new {
             Some(new) => GitRef::Ref(new),
             None => GitRef::Worktree,
+        }
+    }
+
+    fn resolve(&self, source: &SourceType) -> anyhow::Result<GitRev> {
+        match self {
+            Self::Worktree => Ok(GitRev::Worktree),
+            Self::Ref(git_ref) => {
+                let path_in_repo = match source {
+                    SourceType::FlakeCurrentDir => Path::new("."),
+                    SourceType::File(path) => path.as_path(),
+                };
+                let rev = git::resolve_ref(git_ref, path_in_repo)?;
+                let orig_ref = git_ref.clone();
+                Ok(GitRev::Rev { orig_ref, rev })
+            }
         }
     }
 }
@@ -158,18 +188,19 @@ impl std::fmt::Display for Item {
                 self.attr_path
             )?,
         }
-        write!(f, " {YELLOW}({YELLOW:#}{}{YELLOW}){YELLOW:#}", self.git_ref)
+        write!(f, " {}", self.git_rev)
     }
 }
 
-impl std::fmt::Display for GitRef {
+impl std::fmt::Display for GitRev {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GitRef::Ref(r) => {
-                write!(f, "{GREEN}{r}{GREEN:#}")
+            Self::Rev { orig_ref, rev } => {
+                use YELLOW as Y;
+                write!(f, "{Y}({Y:#}{GREEN}{orig_ref}{GREEN:#} {rev}{Y}){Y:#}")
             }
             // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
-            GitRef::Worktree => {
+            Self::Worktree => {
                 write!(f, "{MAGENTA}[worktree]{MAGENTA:#}")
             }
         }
