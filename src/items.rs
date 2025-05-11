@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 
-use crate::{cli::Cli, nix};
+use crate::{
+    cli::Cli,
+    color::{BLUE, CYAN, GREEN, GREEN_BOLD, MAGENTA, RED_BOLD, YELLOW},
+    nix,
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct ItemPair {
@@ -129,4 +133,45 @@ fn parse_path(path: String, file: &Option<PathBuf>, nixos: bool) -> (SourceType,
         attr_path.push_str(".config.system.build.toplevel");
     };
     (source, attr_path)
+}
+
+impl std::fmt::Display for ItemPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{RED_BOLD}-{RED_BOLD:#} {}\n{GREEN_BOLD}+{GREEN_BOLD:#} {}",
+            self.old, self.new
+        )
+    }
+}
+
+impl std::fmt::Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.source {
+            SourceType::FlakeCurrentDir => {
+                write!(f, "{BLUE}.{BLUE:#}{CYAN}#{}{CYAN:#}", self.attr_path)?
+            }
+            SourceType::File(path) => write!(
+                f,
+                "{YELLOW}({YELLOW:#}-f {BLUE}{}{BLUE:#}{YELLOW}){YELLOW:#}{CYAN}.{}{CYAN:#}",
+                path.display(),
+                self.attr_path
+            )?,
+        }
+        write!(f, " {YELLOW}({YELLOW:#}{}{YELLOW}){YELLOW:#}", self.git_ref)
+    }
+}
+
+impl std::fmt::Display for GitRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GitRef::Ref(r) => {
+                write!(f, "{GREEN}{r}{GREEN:#}")
+            }
+            // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
+            GitRef::Worktree => {
+                write!(f, "{MAGENTA}[worktree]{MAGENTA:#}")
+            }
+        }
+    }
 }
