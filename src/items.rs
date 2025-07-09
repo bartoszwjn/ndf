@@ -1,4 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+    sync::LazyLock,
+};
 
 use crate::{
     cli::Cli,
@@ -162,6 +166,18 @@ fn parse_path(path: String, file: &Option<PathBuf>, nixos: bool) -> (SourceType,
     if nixos {
         attr_path.push_str(".config.system.build.toplevel");
     };
+
+    static ALLOWED_CHARS: LazyLock<BTreeSet<char>> = LazyLock::new(|| {
+        let identifier_chars = ['a'..='z', 'A'..='Z', '0'..='9']
+            .into_iter()
+            .flatten()
+            .chain(['_', '\'', '-']);
+        identifier_chars.chain(['.']).collect::<BTreeSet<_>>()
+    });
+    if attr_path.contains(|c| !ALLOWED_CHARS.contains(&c)) {
+        todo!("attr paths with non-identifier characters");
+    }
+
     (source, attr_path)
 }
 
