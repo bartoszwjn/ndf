@@ -11,10 +11,8 @@ fn get_current_system() -> anyhow::Result<String> {
 
 pub(crate) fn get_current_flake_packages() -> anyhow::Result<Vec<String>> {
     let current_system = get_current_system()?;
-    let package_names_fn = format!(
-        "flake: builtins.attrNames ((flake.packages or {{}}).{} or {{}})",
-        current_system,
-    );
+    let package_names_fn =
+        format!("flake: builtins.attrNames ((flake.packages or {{}}).{current_system} or {{}})");
     command::run_json(
         "nix",
         &["eval", "--json", ".#.", "--apply", &package_names_fn],

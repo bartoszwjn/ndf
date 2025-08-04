@@ -34,8 +34,7 @@ pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> anyhow::Result<
     );
     assert!(
         output.chars().all(|c| c.is_ascii_hexdigit()),
-        "'git rev-parse' output contains unexpected characters: {:?}",
-        output
+        "'git rev-parse' output contains unexpected characters: {output:?}"
     );
 
     Ok(output)
