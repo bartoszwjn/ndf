@@ -16,6 +16,7 @@ mod nix;
 
 fn main() -> ExitCode {
     let args = Cli::parse();
+    env_logger::init();
     match run(args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {

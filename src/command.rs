@@ -8,6 +8,7 @@ pub(crate) fn run_json<T: DeserializeOwned>(cmd: &str, args: &[&str]) -> anyhow:
 }
 
 pub(crate) fn output(command: &mut Command) -> anyhow::Result<Vec<u8>> {
+    log::debug!("executing command: {}", show_cmd(command));
     let output = command
         .output()
         .with_context(|| format!("failed to run {}", show_cmd(command)))?;
