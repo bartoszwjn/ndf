@@ -1,19 +1,49 @@
-{ lib, rustPlatform }:
+{ lib, craneLib }:
 let
-  cargoToml = lib.importTOML ./Cargo.toml;
-in
-rustPlatform.buildRustPackage {
-  pname = cargoToml.package.name;
-  version = cargoToml.package.version;
+  src = craneLib.cleanCargoSource ./.;
 
-  src = lib.fileset.toSource {
-    root = ./.;
-    fileset = lib.fileset.unions [
-      ./Cargo.toml
-      ./Cargo.lock
-      ./src
-    ];
+  commonArgs = {
+    inherit src;
+    strictDeps = true;
   };
 
-  cargoLock.lockFile = ./Cargo.lock;
-}
+  cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+  package = craneLib.buildPackage (
+    commonArgs
+    // {
+      inherit cargoArtifacts;
+      doCheck = false;
+
+      passthru.tests = {
+        inherit
+          clippy
+          doc
+          fmt
+          test
+          ;
+      };
+    }
+  );
+
+  clippy = craneLib.cargoClippy (
+    commonArgs
+    // {
+      inherit cargoArtifacts;
+      cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+    }
+  );
+
+  doc = craneLib.cargoDoc (
+    commonArgs
+    // {
+      inherit cargoArtifacts;
+      env.RUSTDOCFLAGS = "--deny warnings";
+    }
+  );
+
+  fmt = craneLib.cargoFmt { inherit src; };
+
+  test = craneLib.cargoTest (commonArgs // { inherit cargoArtifacts; });
+in
+package
