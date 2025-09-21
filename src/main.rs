@@ -3,8 +3,8 @@ use std::process::ExitCode;
 use anstream::{eprintln, println};
 use clap::Parser as _;
 
-use cli::Cli;
-use color::RED_BOLD;
+use cli::{Cli, DiffProgram};
+use color::{GREEN_BOLD, RED_BOLD};
 use items::ItemPair;
 
 mod cli;
@@ -27,11 +27,27 @@ fn main() -> ExitCode {
 }
 
 fn run(args: Cli) -> anyhow::Result<()> {
+    let program = args.program;
     let items = ItemPair::from_args(args)?;
 
-    for pair in items.iter() {
+    for pair in &items {
         println!("{}", pair);
     }
+    println!();
 
-    todo!("diff")
+    for pair in &items {
+        let old_drv_path = nix::get_drv_path(&pair.old)?;
+        let new_drv_path = nix::get_drv_path(&pair.new)?;
+        println!("{RED_BOLD}-{RED_BOLD:#} {} {}", old_drv_path, pair.old);
+        println!("{GREEN_BOLD}+{GREEN_BOLD:#} {} {}", new_drv_path, pair.new);
+        match program {
+            DiffProgram::None => {}
+            DiffProgram::NixDiff => {
+                todo!("nix-diff diff")
+            }
+            DiffProgram::Nvd => todo!("nvd diff"),
+        }
+    }
+
+    todo!("summary");
 }

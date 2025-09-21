@@ -1,6 +1,9 @@
 use std::{path::Path, process::Command};
 
-use crate::command;
+use crate::{
+    command,
+    items::{GitRev, Item, SourceType},
+};
 
 fn get_current_system() -> anyhow::Result<String> {
     command::run_json(
@@ -34,4 +37,27 @@ pub(crate) fn get_file_output_attributes(file: &Path) -> anyhow::Result<Vec<Stri
                 "x: let r = if builtins.isFunction x then x {} else x; in builtins.attrNames r",
             ]),
     )
+}
+
+pub(crate) fn get_drv_path(item: &Item) -> anyhow::Result<String> {
+    match item.source {
+        SourceType::FlakeCurrentDir => {
+            let flake_ref = match &item.git_rev {
+                GitRev::Worktree => String::from(".#"),
+                GitRev::Rev { rev, .. } => format!(".?rev={rev}#"),
+            } + &item.attr_path;
+            command::run_json(
+                "nix",
+                &[
+                    "eval",
+                    "--json",
+                    "--apply",
+                    "v: v.drvPath",
+                    "--",
+                    &flake_ref,
+                ],
+            )
+        }
+        SourceType::File(_) => todo!("get drv path from file"),
+    }
 }
