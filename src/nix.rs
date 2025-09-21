@@ -2,7 +2,7 @@ use std::{path::Path, process::Command};
 
 use crate::{
     command,
-    items::{GitRev, Item, SourceType},
+    spec::{AttrPath, GitRev, Source},
 };
 
 fn get_current_system() -> anyhow::Result<String> {
@@ -39,13 +39,17 @@ pub(crate) fn get_file_output_attributes(file: &Path) -> anyhow::Result<Vec<Stri
     )
 }
 
-pub(crate) fn get_drv_path(item: &Item) -> anyhow::Result<String> {
-    match item.source {
-        SourceType::FlakeCurrentDir => {
-            let flake_ref = match &item.git_rev {
+pub(crate) fn get_drv_path(
+    source: &Source,
+    git_rev: &GitRev,
+    attr_path: &AttrPath,
+) -> anyhow::Result<String> {
+    match source {
+        Source::FlakeCurrentDir => {
+            let flake_ref = match git_rev {
                 GitRev::Worktree => String::from(".#"),
                 GitRev::Rev { rev, .. } => format!(".?rev={rev}#"),
-            } + &item.attr_path;
+            } + &attr_path.0;
             command::run_json(
                 "nix",
                 &[
@@ -58,6 +62,6 @@ pub(crate) fn get_drv_path(item: &Item) -> anyhow::Result<String> {
                 ],
             )
         }
-        SourceType::File(_) => todo!("get drv path from file"),
+        Source::File(_) => todo!("get drv path from file"),
     }
 }

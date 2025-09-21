@@ -3,16 +3,18 @@ use std::process::ExitCode;
 use anstream::{eprintln, println};
 use clap::Parser as _;
 
-use cli::{Cli, DiffProgram};
-use color::{GREEN_BOLD, RED_BOLD};
-use items::ItemPair;
+use crate::{
+    cli::{Cli, DiffProgram},
+    color::{GREEN_BOLD, RED_BOLD},
+    spec::DiffSpec,
+};
 
 mod cli;
 mod color;
 mod command;
 mod git;
-mod items;
 mod nix;
+mod spec;
 
 fn main() -> ExitCode {
     let args = Cli::parse();
@@ -27,20 +29,31 @@ fn main() -> ExitCode {
 }
 
 fn run(args: Cli) -> anyhow::Result<()> {
-    let program = args.program;
-    let items = ItemPair::from_args(args)?;
+    let spec = DiffSpec::from_args(args)?;
 
-    for pair in &items {
-        println!("{}", pair);
-    }
-    println!();
+    println!("{spec}");
 
-    for pair in &items {
-        let old_drv_path = nix::get_drv_path(&pair.old)?;
-        let new_drv_path = nix::get_drv_path(&pair.new)?;
-        println!("{RED_BOLD}-{RED_BOLD:#} {} {}", old_drv_path, pair.old);
-        println!("{GREEN_BOLD}+{GREEN_BOLD:#} {} {}", new_drv_path, pair.new);
-        match program {
+    let common_lhs_drv_path = spec
+        .common_lhs
+        .as_ref()
+        .map(|lhs| nix::get_drv_path(&spec.source, &spec.old_rev, lhs))
+        .transpose()?;
+
+    for path in &spec.attr_paths {
+        let old_drv_path = match &common_lhs_drv_path {
+            Some(drv_path) => drv_path,
+            None => &nix::get_drv_path(&spec.source, &spec.old_rev, path)?,
+        };
+        let new_drv_path = nix::get_drv_path(&spec.source, &spec.new_rev, path)?;
+
+        println!(
+            "{RED_BOLD}-{RED_BOLD:#} {} {}",
+            old_drv_path,
+            spec.common_lhs.as_ref().unwrap_or(path)
+        );
+        println!("{GREEN_BOLD}+{GREEN_BOLD:#} {} {}", new_drv_path, path);
+
+        match spec.program {
             DiffProgram::None => {}
             DiffProgram::NixDiff => {
                 todo!("nix-diff diff")

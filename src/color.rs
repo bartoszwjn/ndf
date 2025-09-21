@@ -8,6 +8,8 @@ pub(crate) const MAGENTA: Style = AnsiColor::Magenta.on_default();
 pub(crate) const YELLOW: Style = AnsiColor::Yellow.on_default();
 // keep-sorted end
 
+pub(crate) const BOLD: Style = Style::new().bold();
+
 // keep-sorted start
 pub(crate) const GREEN_BOLD: Style = AnsiColor::Green.on_default().bold();
 pub(crate) const RED_BOLD: Style = AnsiColor::Red.on_default().bold();

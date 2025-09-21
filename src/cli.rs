@@ -6,7 +6,7 @@ use clap::{Parser, ValueEnum};
 #[derive(Clone, Debug, Parser)]
 #[command(version)]
 pub(crate) struct Cli {
-    /// Compare all other paths to this one.
+    /// Compare all other attribute paths to this one.
     #[arg(long)]
     pub(crate) lhs: Option<String>,
 
@@ -30,21 +30,29 @@ pub(crate) struct Cli {
     #[arg(short, long)]
     pub(crate) file: Option<PathBuf>,
 
+    /// Interpret paths as attribute paths relative to the given flake reference.
+    ///
+    /// The default is to interpret paths as relative to the flake located in the current
+    /// directory.
+    #[arg(long, conflicts_with("file"))]
+    pub(crate) flake: Option<String>,
+
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
-    /// Each <PATH> will be treated as if `<PATH>.config.system.build.toplevel` was passed instead
-    /// (`nixosConfigurations.<PATH>.config.system.build.toplevel` in case of flake references).
+    /// Each '<ATTR_PATH>' will be treated as if '<ATTR_PATH>.config.system.build.toplevel'
+    /// was passed instead ('nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel'
+    /// when working with flake outputs).
     #[arg(long)]
     pub(crate) nixos: bool,
 
-    /// Paths to compare.
+    /// Attribute paths to compare.
     ///
     /// Each path is compared to itself between the old and new revision,
     /// unless '--lhs' is specified.
     ///
     /// These are interpreted as flake output attributes, unless overridden by other options.
     #[arg()]
-    pub(crate) paths: Vec<String>,
+    pub(crate) attr_paths: Vec<String>,
 }
 
 /// Program used to compare derivations.
