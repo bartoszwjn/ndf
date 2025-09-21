@@ -1,12 +1,13 @@
 use std::process::ExitCode;
 
-use anstream::{eprintln, println};
+use anstream::{eprintln, print, println};
 use clap::Parser as _;
 
 use crate::{
     cli::{Cli, DiffProgram},
-    color::{GREEN_BOLD, RED_BOLD},
+    color::RED_BOLD,
     spec::DiffSpec,
+    summary::{Summary, SummaryItem},
 };
 
 mod cli;
@@ -15,6 +16,7 @@ mod command;
 mod git;
 mod nix;
 mod spec;
+mod summary;
 
 fn main() -> ExitCode {
     let args = Cli::parse();
@@ -39,19 +41,13 @@ fn run(args: Cli) -> anyhow::Result<()> {
         .map(|lhs| nix::get_drv_path(&spec.source, &spec.old_rev, lhs))
         .transpose()?;
 
-    for path in &spec.attr_paths {
+    let mut summary = Summary { items: vec![] };
+    for path in spec.attr_paths {
         let old_drv_path = match &common_lhs_drv_path {
-            Some(drv_path) => drv_path,
-            None => &nix::get_drv_path(&spec.source, &spec.old_rev, path)?,
+            Some(drv_path) => drv_path.clone(),
+            None => nix::get_drv_path(&spec.source, &spec.old_rev, &path)?,
         };
-        let new_drv_path = nix::get_drv_path(&spec.source, &spec.new_rev, path)?;
-
-        println!(
-            "{RED_BOLD}-{RED_BOLD:#} {} {}",
-            old_drv_path,
-            spec.common_lhs.as_ref().unwrap_or(path)
-        );
-        println!("{GREEN_BOLD}+{GREEN_BOLD:#} {} {}", new_drv_path, path);
+        let new_drv_path = nix::get_drv_path(&spec.source, &spec.new_rev, &path)?;
 
         match spec.program {
             DiffProgram::None => {}
@@ -60,7 +56,15 @@ fn run(args: Cli) -> anyhow::Result<()> {
             }
             DiffProgram::Nvd => todo!("nvd diff"),
         }
+
+        summary.items.push(SummaryItem {
+            common_lhs: spec.common_lhs.clone(),
+            attr_path: path,
+            old_drv_path,
+            new_drv_path,
+        })
     }
 
-    todo!("summary");
+    print!("{summary}");
+    Ok(())
 }

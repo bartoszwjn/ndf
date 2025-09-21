@@ -23,7 +23,7 @@ pub(crate) struct Cli {
     pub(crate) new: Option<String>,
 
     /// Program to use for comparing derivations.
-    #[arg(short, long, default_value = "nix-diff")]
+    #[arg(short, long, default_value = "none")]
     pub(crate) program: DiffProgram,
 
     /// Interpret paths as attribute paths relative to the Nix expression in the given file.
