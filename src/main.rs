@@ -19,18 +19,20 @@ mod spec;
 mod summary;
 
 fn main() -> ExitCode {
-    let args = Cli::parse();
+    let args = Cli::parse(); // on error returns with exit code 2
     env_logger::init();
     match run(args) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(exit_code) => exit_code,
+        // In case of an unwinding panic the exit code is 101.
+        // Aborting panic raises SIGABRT (6).
         Err(err) => {
             eprintln!("{RED_BOLD}error:{RED_BOLD:#} {err}");
-            ExitCode::FAILURE
+            ExitCode::from(2)
         }
     }
 }
 
-fn run(args: Cli) -> anyhow::Result<()> {
+fn run(args: Cli) -> anyhow::Result<ExitCode> {
     let spec = DiffSpec::from_args(args)?;
 
     println!("{spec}");
@@ -66,5 +68,14 @@ fn run(args: Cli) -> anyhow::Result<()> {
     }
 
     print!("{summary}");
-    Ok(())
+
+    let all_equal = summary
+        .items
+        .iter()
+        .all(|item| item.old_drv_path == item.new_drv_path);
+    Ok(if all_equal {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    })
 }
