@@ -1,7 +1,23 @@
-use std::{borrow::Cow, ffi::OsStr, process::Command};
+use std::{
+    borrow::Cow,
+    ffi::OsStr,
+    process::{Command, Stdio},
+};
 
 use anyhow::Context as _;
 use serde::de::DeserializeOwned;
+
+pub(crate) fn run_inherit_stdio(cmd: &str, args: &[&str]) -> anyhow::Result<()> {
+    let output = output(
+        Command::new(cmd)
+            .args(args)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit()),
+    )?;
+    assert_eq!(output.len(), 0);
+    Ok(())
+}
 
 pub(crate) fn run_json<T: DeserializeOwned>(cmd: &str, args: &[&str]) -> anyhow::Result<T> {
     output_json(Command::new(cmd).args(args))

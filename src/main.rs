@@ -5,8 +5,8 @@ use clap::Parser as _;
 
 use crate::{
     cli::{Cli, DiffProgram},
-    color::RED_BOLD,
-    spec::DiffSpec,
+    color::{GREEN_BOLD, RED_BOLD},
+    spec::{AttrPath, DiffSpec, GitRev},
     summary::{Summary, SummaryItem},
 };
 
@@ -54,7 +54,14 @@ fn run(args: Cli) -> anyhow::Result<ExitCode> {
         match spec.program {
             DiffProgram::None => {}
             DiffProgram::NixDiff => {
-                todo!("nix-diff diff")
+                if old_drv_path != new_drv_path {
+                    print_pair_cmp(
+                        (spec.common_lhs.as_ref().unwrap_or(&path), &spec.old_rev),
+                        (&path, &spec.new_rev),
+                    );
+                    run_nix_diff(&old_drv_path, &new_drv_path)?;
+                    println!();
+                }
             }
             DiffProgram::Nvd => todo!("nvd diff"),
         }
@@ -78,4 +85,29 @@ fn run(args: Cli) -> anyhow::Result<ExitCode> {
     } else {
         ExitCode::from(1)
     })
+}
+
+fn print_pair_cmp(lhs: (&AttrPath, &GitRev), rhs: (&AttrPath, &GitRev)) {
+    let width_l = unicode_width::UnicodeWidthStr::width(lhs.0.0.as_str());
+    let width_r = unicode_width::UnicodeWidthStr::width(rhs.0.0.as_str());
+    let width = width_l.max(width_r);
+    let lhs_pad = width - width_l;
+    let rhs_pad = width - width_r;
+    println!("{RED_BOLD}-{RED_BOLD:#} {}{:lhs_pad$} {}", lhs.0, "", lhs.1);
+    println!(
+        "{GREEN_BOLD}+{GREEN_BOLD:#} {}{:rhs_pad$} {}",
+        rhs.0, "", rhs.1
+    );
+}
+
+fn run_nix_diff(old_drv_path: &str, new_drv_path: &str) -> anyhow::Result<()> {
+    command::run_inherit_stdio(
+        "nix-diff",
+        &[
+            "--character-oriented",
+            "--skip-already-compared",
+            old_drv_path,
+            new_drv_path,
+        ],
+    )
 }
