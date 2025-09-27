@@ -54,7 +54,7 @@
             }
           );
         }
-        // lib.mapAttrs' (testName: test: lib.nameValuePair "ndf-test-${testName}" test) ndf.tests;
+        // lib.mapAttrs' (testName: lib.nameValuePair "ndf-test-${testName}") ndf.tests;
 
         devShells.default = craneLib.devShell {
           inputsFrom = [ treefmtEval.config.build.devShell ];
