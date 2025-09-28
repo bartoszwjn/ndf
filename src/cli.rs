@@ -7,7 +7,7 @@ const AFTER_HELP: &str = concat![
     " and something other than 0 or 1 in case of an error.",
 ];
 
-/// Compare nix packages and derivations across revisions
+/// Compare Nix derivations between commits.
 #[derive(Clone, Debug, Parser)]
 #[command(version, after_help(AFTER_HELP))]
 pub(crate) struct Cli {
