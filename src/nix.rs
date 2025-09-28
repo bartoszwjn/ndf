@@ -7,8 +7,14 @@ use crate::{
 
 fn get_current_system() -> anyhow::Result<String> {
     command::run_json(
-        "nix-instantiate",
-        &["--eval", "--json", "--expr", "builtins.currentSystem"],
+        "nix",
+        &[
+            "eval",
+            "--impure",
+            "--json",
+            "--expr",
+            "builtins.currentSystem",
+        ],
     )
 }
 
