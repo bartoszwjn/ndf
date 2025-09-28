@@ -54,6 +54,10 @@ pub(crate) fn get_drv_path(
                 "nix",
                 &[
                     "eval",
+                    // Eval cache hardly works, sometimes it even seems to make things slower.
+                    // It also causes Nix to report "SQLite database is busy" errors
+                    // when running multiple evaluations in parallel.
+                    "--no-eval-cache",
                     "--json",
                     "--apply",
                     "v: v.drvPath",

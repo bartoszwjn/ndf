@@ -50,6 +50,13 @@ pub(crate) struct Cli {
     #[arg(long)]
     pub(crate) nixos: bool,
 
+    /// Maximum number of Nix evaluations to perform in parallel.
+    ///
+    /// Zero (the default) means "as many as there are available threads",
+    /// a negative number '-N' means "N fewer than the number of available threads".
+    #[arg(long, default_value = "0")]
+    pub(crate) eval_jobs: isize,
+
     /// Attribute paths to compare.
     ///
     /// Each path is compared to itself between the old and new revision,
