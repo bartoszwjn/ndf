@@ -15,6 +15,7 @@ use rayon::{
 use crate::{
     cli::{Cli, DiffProgram},
     color::{GREEN_BOLD, RED_BOLD},
+    command::Cmd,
     spec::{AttrPath, DiffSpec, GitRev, Source},
     summary::{Summary, SummaryItem},
 };
@@ -240,13 +241,12 @@ fn print_pair_cmp(lhs: EvalSpec, rhs: EvalSpec) {
 }
 
 fn run_nix_diff(old_drv_path: &str, new_drv_path: &str) -> anyhow::Result<()> {
-    command::run_inherit_stdio(
-        "nix-diff",
-        &[
+    Cmd::nix_diff()
+        .args([
             "--character-oriented",
             "--skip-already-compared",
             old_drv_path,
             new_drv_path,
-        ],
-    )
+        ])
+        .run_inherit_stdio()
 }

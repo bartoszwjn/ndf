@@ -1,8 +1,8 @@
-use std::{path::Path, process::Command};
+use std::path::Path;
 
 use anyhow::Context as _;
 
-use crate::command;
+use crate::command::Cmd;
 
 pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> anyhow::Result<String> {
     let path_metadata = path_in_repo
@@ -17,11 +17,10 @@ pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> anyhow::Result<
         }
     };
 
-    let output = command::output(
-        Command::new("git")
-            .args(["rev-parse", "--verify", "--end-of-options", git_ref])
-            .current_dir(dir_in_repo),
-    )?;
+    let output = Cmd::git()
+        .args(["rev-parse", "--verify", "--end-of-options", git_ref])
+        .current_dir(dir_in_repo)
+        .output()?;
     let mut output =
         String::from_utf8(output).context("output of 'git rev-parse' is not valid utf8")?;
     output.truncate(output.trim_end().len());
