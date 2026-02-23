@@ -18,7 +18,6 @@ pub(crate) struct DiffSpec {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Source {
     FlakeCurrentDir,
-    // TODO: arbitrary flake refs
     File(PathBuf),
 }
 

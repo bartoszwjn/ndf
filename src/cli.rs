@@ -27,7 +27,8 @@ pub struct Cli {
     ///
     /// Each path is compared between the revisions specified with `--from` and `--to`.
     ///
-    /// By default, these paths are interpreted as flake output attributes.
+    /// By default, these paths are interpreted as flake output attributes
+    /// of the flake in the current working directory.
     #[arg()]
     attr_paths: Vec<String>,
 
@@ -57,19 +58,12 @@ pub struct Cli {
     #[arg(long)]
     file: Option<PathBuf>,
 
-    /// Interpret paths as attribute paths relative to the given flake reference.
-    ///
-    /// The default is to interpret paths as relative to the flake located in the current
-    /// directory.
-    #[arg(long, conflicts_with("file"))]
-    flake: Option<String>,
-
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
-    /// Each '<ATTR_PATH>' will be treated
-    /// as if '<ATTR_PATH>.config.system.build.toplevel' was passed instead
-    /// ('nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel' for flake outputs).
-    #[arg(long)]
+    /// Each '<ATTR_PATH>' will be transformed to:
+    /// - '<ATTR_PATH>.config.system.build.toplevel' if '--file' was used,
+    /// - 'nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel' for flake outputs.
+    #[arg(long, verbatim_doc_comment)]
     nixos: bool,
 
     /// Maximum number of Nix evaluations to perform in parallel.
@@ -113,11 +107,9 @@ impl Cli {
     }
 
     fn build_diff_spec(self) -> eyre::Result<DiffSpec> {
-        let source = match (self.file, self.flake) {
-            (None, None) => Source::FlakeCurrentDir,
-            (None, Some(_)) => todo!("--flake"),
-            (Some(path), None) => Source::File(path),
-            (Some(_), Some(_)) => unreachable!("--file and --flake are mutually exclusive"),
+        let source = match self.file {
+            None => Source::FlakeCurrentDir,
+            Some(path) => Source::File(path),
         };
 
         let from = make_from(self.from, &source, &self.base)?;
