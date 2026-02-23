@@ -1,11 +1,18 @@
-use std::{num::NonZero, path::PathBuf, process::ExitCode};
+use std::{
+    num::NonZero,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 use anstream::{print, println};
 use anyhow::Context;
 use clap::{Parser, ValueEnum};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
-use crate::{diff_spec::DiffSpec, eval};
+use crate::{
+    diff_spec::{AttrPath, DiffSpec, GitRev, Source},
+    eval, git, nix,
+};
 
 const AFTER_HELP: &str = concat![
     "Exit code is 0 if all derivations are the same, 1 if any are different,",
@@ -22,7 +29,7 @@ pub struct Cli {
     ///
     /// By default, these paths are interpreted as flake output attributes.
     #[arg()]
-    pub(crate) attr_paths: Vec<String>,
+    attr_paths: Vec<String>,
 
     /// Report changes from this revision.
     ///
@@ -30,32 +37,32 @@ pub struct Cli {
     /// - HEAD if '--base' is not specified,
     /// - current worktree otherwise.
     #[arg(short = 'f', long, verbatim_doc_comment)]
-    pub(crate) from: Option<String>,
+    from: Option<String>,
 
     /// Report changes to this revision.
     ///
     /// When omitted defaults to the current worktree.
     #[arg(short = 't', long)]
-    pub(crate) to: Option<String>,
+    to: Option<String>,
 
     /// Compare all other attribute paths to this one.
     #[arg(long)]
-    pub(crate) base: Option<String>,
+    base: Option<String>,
 
     /// Program used for comparing derivations.
     #[arg(long, default_value = "none")]
-    pub(crate) tool: DiffTool,
+    tool: DiffTool,
 
     /// Interpret paths as attribute paths relative to the Nix expression in the given file.
     #[arg(long)]
-    pub(crate) file: Option<PathBuf>,
+    file: Option<PathBuf>,
 
     /// Interpret paths as attribute paths relative to the given flake reference.
     ///
     /// The default is to interpret paths as relative to the flake located in the current
     /// directory.
     #[arg(long, conflicts_with("file"))]
-    pub(crate) flake: Option<String>,
+    flake: Option<String>,
 
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
@@ -63,7 +70,7 @@ pub struct Cli {
     /// as if '<ATTR_PATH>.config.system.build.toplevel' was passed instead
     /// ('nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel' for flake outputs).
     #[arg(long)]
-    pub(crate) nixos: bool,
+    nixos: bool,
 
     /// Maximum number of Nix evaluations to perform in parallel.
     ///
@@ -85,7 +92,7 @@ pub(crate) enum DiffTool {
 impl Cli {
     pub fn run(self) -> anyhow::Result<ExitCode> {
         let eval_jobs = self.eval_jobs;
-        let spec = DiffSpec::from_args(self)?;
+        let spec = self.build_diff_spec()?;
 
         println!("{spec}");
 
@@ -103,6 +110,92 @@ impl Cli {
         } else {
             ExitCode::from(1)
         })
+    }
+
+    fn build_diff_spec(self) -> anyhow::Result<DiffSpec> {
+        let source = match (self.file, self.flake) {
+            (None, None) => Source::FlakeCurrentDir,
+            (None, Some(_)) => todo!("--flake"),
+            (Some(path), None) => Source::File(path),
+            (Some(_), Some(_)) => unreachable!("--file and --flake are mutually exclusive"),
+        };
+
+        let from = make_from(self.from, &source, &self.base)?;
+        let to = make_to(self.to, &source)?;
+        let tool = self.tool;
+
+        let base = self
+            .base
+            .map(|base| attr_path_from_args(base, self.nixos, &source));
+
+        let attr_paths = {
+            let attr_paths = if self.attr_paths.is_empty() {
+                get_default_attr_paths(&source, self.nixos)?
+            } else {
+                self.attr_paths
+            };
+            attr_paths
+                .into_iter()
+                .map(|attr_path| attr_path_from_args(attr_path, self.nixos, &source))
+                .collect()
+        };
+
+        Ok(DiffSpec {
+            source,
+            from,
+            to,
+            tool,
+            base,
+            attr_paths,
+        })
+    }
+}
+
+fn make_from(
+    from: Option<String>,
+    source: &Source,
+    base: &Option<String>,
+) -> anyhow::Result<GitRev> {
+    match (from, base) {
+        (Some(from), _) => resolve_git_ref(from, source),
+        (None, Some(_)) => Ok(GitRev::Worktree),
+        (None, None) => resolve_git_ref("HEAD".to_owned(), source),
+    }
+}
+
+fn make_to(to: Option<String>, source: &Source) -> anyhow::Result<GitRev> {
+    match to {
+        Some(to) => resolve_git_ref(to, source),
+        None => Ok(GitRev::Worktree),
+    }
+}
+
+fn resolve_git_ref(orig_ref: String, source: &Source) -> anyhow::Result<GitRev> {
+    let path_in_repo = match source {
+        Source::FlakeCurrentDir => Path::new("."),
+        Source::File(path) => path.as_path(),
+    };
+    let rev = git::resolve_ref(&orig_ref, path_in_repo)?;
+    Ok(GitRev::Rev { orig_ref, rev })
+}
+
+fn get_default_attr_paths(source: &Source, nixos: bool) -> anyhow::Result<Vec<String>> {
+    Ok(match source {
+        Source::FlakeCurrentDir if nixos => nix::get_current_flake_nixos_configurations()?,
+        Source::FlakeCurrentDir => nix::get_current_flake_packages()?,
+        Source::File(file) => nix::get_file_output_attributes(file)?,
+    })
+}
+
+fn attr_path_from_args(attr_path: String, nixos: bool, source: &Source) -> AttrPath {
+    match (nixos, source) {
+        (false, _) => AttrPath(attr_path),
+        (true, Source::FlakeCurrentDir) => {
+            let mut attr_path = attr_path;
+            attr_path.insert_str(0, "nixosConfigurations.");
+            AttrPath(attr_path + ".config.system.build.toplevel")
+        }
+        (true, Source::File(_)) => AttrPath(attr_path + ".config.system.build.toplevel"),
     }
 }
 
