@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::{
     command::Cmd,
-    spec::{AttrPath, GitRev, Source},
+    diff_spec::{AttrPath, GitRev, Source},
 };
 
 fn get_current_system() -> anyhow::Result<String> {

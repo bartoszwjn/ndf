@@ -2,7 +2,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     color::{BOLD, GREEN, RED},
-    spec::AttrPath,
+    diff_spec::AttrPath,
 };
 
 pub(crate) struct Summary {

@@ -15,16 +15,16 @@ use crate::{
     cli::DiffProgram,
     color::{GREEN_BOLD, RED_BOLD},
     command::Cmd,
-    spec::{AttrPath, DiffSpec, GitRev, Source},
+    diff_spec::{AttrPath, DiffSpec, GitRev, Source},
     summary::{Summary, SummaryItem},
 };
 
 mod cli;
 mod color;
 mod command;
+mod diff_spec;
 mod git;
 mod nix;
-mod spec;
 mod summary;
 
 #[doc(hidden)]
