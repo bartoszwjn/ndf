@@ -12,6 +12,7 @@ pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> anyhow::Result<
         path_in_repo
     } else {
         match path_in_repo.parent() {
+            Some(parent) if parent.as_os_str().is_empty() => Path::new("."),
             Some(parent) => parent,
             None => unreachable!("path points to a non-directory and doesn't have a parent"),
         }
