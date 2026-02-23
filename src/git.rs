@@ -1,13 +1,13 @@
 use std::path::Path;
 
-use anyhow::Context as _;
+use eyre::WrapErr;
 
 use crate::command::Cmd;
 
-pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> anyhow::Result<String> {
+pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> eyre::Result<String> {
     let path_metadata = path_in_repo
         .metadata()
-        .with_context(|| format!("failed to query metadata of {}", path_in_repo.display()))?;
+        .wrap_err_with(|| format!("failed to query metadata of {}", path_in_repo.display()))?;
     let dir_in_repo = if path_metadata.is_dir() {
         path_in_repo
     } else {
@@ -23,7 +23,7 @@ pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> anyhow::Result<
         .current_dir(dir_in_repo)
         .output()?;
     let mut output =
-        String::from_utf8(output).context("output of 'git rev-parse' is not valid utf8")?;
+        String::from_utf8(output).wrap_err("output of 'git rev-parse' is not valid utf8")?;
     output.truncate(output.trim_end().len());
 
     assert_eq!(

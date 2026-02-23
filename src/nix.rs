@@ -5,7 +5,7 @@ use crate::{
     diff_spec::{AttrPath, GitRev, Source},
 };
 
-fn get_current_system() -> anyhow::Result<String> {
+fn get_current_system() -> eyre::Result<String> {
     Cmd::nix()
         .args([
             "eval",
@@ -17,7 +17,7 @@ fn get_current_system() -> anyhow::Result<String> {
         .output_json()
 }
 
-pub(crate) fn get_current_flake_packages() -> anyhow::Result<Vec<String>> {
+pub(crate) fn get_current_flake_packages() -> eyre::Result<Vec<String>> {
     let current_system = get_current_system()?;
     let package_names_fn =
         format!("flake: builtins.attrNames (flake.packages.{current_system} or {{}})");
@@ -26,14 +26,14 @@ pub(crate) fn get_current_flake_packages() -> anyhow::Result<Vec<String>> {
         .output_json()
 }
 
-pub(crate) fn get_current_flake_nixos_configurations() -> anyhow::Result<Vec<String>> {
+pub(crate) fn get_current_flake_nixos_configurations() -> eyre::Result<Vec<String>> {
     let nixos_names_fn = "flake: builtins.attrNames (flake.nixosConfigurations or {})";
     Cmd::nix()
         .args(["eval", "--json", ".#.", "--apply", nixos_names_fn])
         .output_json()
 }
 
-pub(crate) fn get_file_output_attributes(file: &Path) -> anyhow::Result<Vec<String>> {
+pub(crate) fn get_file_output_attributes(file: &Path) -> eyre::Result<Vec<String>> {
     Cmd::nix()
         .args(["eval", "--json", "--file"])
         .arg(file)
@@ -48,7 +48,7 @@ pub(crate) fn get_drv_path(
     source: &Source,
     git_rev: &GitRev,
     attr_path: &AttrPath,
-) -> anyhow::Result<String> {
+) -> eyre::Result<String> {
     match source {
         Source::FlakeCurrentDir => {
             let flake_ref = match git_rev {

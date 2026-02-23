@@ -5,7 +5,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::Context as _;
+use eyre::WrapErr;
 use serde::de::DeserializeOwned;
 
 #[derive(Debug)]
@@ -55,7 +55,7 @@ impl Cmd {
 
 /// Running commands
 impl Cmd {
-    pub(crate) fn run_inherit_stdio(&mut self) -> anyhow::Result<()> {
+    pub(crate) fn run_inherit_stdio(&mut self) -> eyre::Result<()> {
         let output = self
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
@@ -65,12 +65,12 @@ impl Cmd {
         Ok(())
     }
 
-    pub(crate) fn output(&mut self) -> anyhow::Result<Vec<u8>> {
+    pub(crate) fn output(&mut self) -> eyre::Result<Vec<u8>> {
         log::debug!("executing command: {}", show_cmd(&self.inner));
         let output = self
             .inner
             .output()
-            .with_context(|| format!("failed to run {}", show_cmd(&self.inner)))?;
+            .wrap_err_with(|| format!("failed to run {}", show_cmd(&self.inner)))?;
 
         if !output.status.success() {
             let mut msg = format!(
@@ -88,15 +88,15 @@ impl Cmd {
                 msg.push_str(&String::from_utf8_lossy(&output.stderr));
                 msg.push('\n');
             }
-            return Err(anyhow::Error::msg(msg));
+            return Err(eyre::Error::msg(msg));
         }
 
         Ok(output.stdout)
     }
 
-    pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> anyhow::Result<T> {
+    pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
         serde_json::from_slice(&self.output()?)
-            .with_context(|| format!("failed to decode output of {}", show_cmd(&self.inner)))
+            .wrap_err_with(|| format!("failed to decode output of {}", show_cmd(&self.inner)))
     }
 }
 

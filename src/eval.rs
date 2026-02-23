@@ -36,7 +36,7 @@ impl<'spec> EvalSpec<'spec> {
         }
     }
 
-    pub(crate) fn run(&self) -> anyhow::Result<String> {
+    pub(crate) fn run(&self) -> eyre::Result<String> {
         nix::get_drv_path(self.source, self.git_rev, self.attr_path)
     }
 }
@@ -44,7 +44,7 @@ impl<'spec> EvalSpec<'spec> {
 pub(crate) fn eval_and_compare_paths(
     spec: &DiffSpec,
     thread_pool: Option<ThreadPool>,
-) -> anyhow::Result<Summary> {
+) -> eyre::Result<Summary> {
     let items = match thread_pool {
         Some(thread_pool) => eval_and_compare_paths_parallel(spec, thread_pool)?,
         None => eval_and_compare_paths_sequential(spec)?,
@@ -57,8 +57,8 @@ pub(crate) fn eval_and_compare_paths(
 /// Evaluation results are cached,
 /// and evaluation is delayed until the result is needed for the first time.
 /// That way we don't have to wait for all evalutations before showing the first diff.
-fn eval_and_compare_paths_sequential(spec: &DiffSpec) -> anyhow::Result<Vec<SummaryItem>> {
-    let mut cached_results = HashMap::<EvalSpec, anyhow::Result<String>>::new();
+fn eval_and_compare_paths_sequential(spec: &DiffSpec) -> eyre::Result<Vec<SummaryItem>> {
+    let mut cached_results = HashMap::<EvalSpec, eyre::Result<String>>::new();
     let mut get_drv_path = |eval_spec| {
         let result = cached_results
             .entry(eval_spec)
@@ -76,14 +76,14 @@ fn eval_and_compare_paths_sequential(spec: &DiffSpec) -> anyhow::Result<Vec<Summ
 fn eval_and_compare_paths_parallel(
     spec: &DiffSpec,
     thread_pool: ThreadPool,
-) -> anyhow::Result<Vec<SummaryItem>> {
+) -> eyre::Result<Vec<SummaryItem>> {
     // Evaluate everything once, then get results from a map.
     let eval_jobs: HashSet<EvalSpec> = spec
         .attr_paths
         .iter()
         .flat_map(|path| [EvalSpec::lhs(spec, path), EvalSpec::rhs(spec, path)])
         .collect();
-    let mut cached_results: HashMap<EvalSpec, anyhow::Result<String>> =
+    let mut cached_results: HashMap<EvalSpec, eyre::Result<String>> =
         thread_pool.install(|| eval_jobs.par_iter().map(|job| (*job, job.run())).collect());
     let mut get_drv_path = |eval_spec| {
         let result = cached_results
@@ -98,13 +98,13 @@ fn eval_and_compare_paths_parallel(
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn extract_cached_drv_path_result(result: &mut anyhow::Result<String>) -> anyhow::Result<String> {
+fn extract_cached_drv_path_result(result: &mut eyre::Result<String>) -> eyre::Result<String> {
     match result {
         Ok(drv_path) => Ok(drv_path.clone()),
         Err(error) => {
-            // anyhow errors can't be cloned, return the error we have saved and leave
+            // eyre errors can't be cloned, return the error we have saved and leave
             // a placeholder error in case someone tries to get the same result again.
-            let placeholder = anyhow::anyhow!("failed to evaluate derivation path");
+            let placeholder = eyre::eyre!("failed to evaluate derivation path");
             Err(std::mem::replace(error, placeholder))
         }
     }

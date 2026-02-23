@@ -12,8 +12,8 @@ use crate::{
 pub(crate) fn compare_paths<'spec>(
     attr_path: &'spec AttrPath,
     spec: &'spec DiffSpec,
-    mut get_drv_path: impl FnMut(EvalSpec<'spec>) -> anyhow::Result<String>,
-) -> anyhow::Result<SummaryItem> {
+    mut get_drv_path: impl FnMut(EvalSpec<'spec>) -> eyre::Result<String>,
+) -> eyre::Result<SummaryItem> {
     let lhs_spec = EvalSpec::lhs(spec, attr_path);
     let rhs_spec = EvalSpec::rhs(spec, attr_path);
     let old_drv_path = get_drv_path(lhs_spec)?;
@@ -54,7 +54,7 @@ fn print_pair_cmp(lhs: EvalSpec, rhs: EvalSpec) {
     );
 }
 
-fn run_nix_diff(old_drv_path: &str, new_drv_path: &str) -> anyhow::Result<()> {
+fn run_nix_diff(old_drv_path: &str, new_drv_path: &str) -> eyre::Result<()> {
     Cmd::nix_diff()
         .args([
             "--character-oriented",

@@ -5,8 +5,8 @@ use std::{
 };
 
 use anstream::{print, println};
-use anyhow::Context;
 use clap::{Parser, ValueEnum};
+use eyre::WrapErr;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
@@ -90,7 +90,7 @@ pub(crate) enum DiffTool {
 }
 
 impl Cli {
-    pub fn run(self) -> anyhow::Result<ExitCode> {
+    pub fn run(self) -> eyre::Result<ExitCode> {
         let eval_jobs = self.eval_jobs;
         let spec = self.build_diff_spec()?;
 
@@ -112,7 +112,7 @@ impl Cli {
         })
     }
 
-    fn build_diff_spec(self) -> anyhow::Result<DiffSpec> {
+    fn build_diff_spec(self) -> eyre::Result<DiffSpec> {
         let source = match (self.file, self.flake) {
             (None, None) => Source::FlakeCurrentDir,
             (None, Some(_)) => todo!("--flake"),
@@ -151,11 +151,7 @@ impl Cli {
     }
 }
 
-fn make_from(
-    from: Option<String>,
-    source: &Source,
-    base: &Option<String>,
-) -> anyhow::Result<GitRev> {
+fn make_from(from: Option<String>, source: &Source, base: &Option<String>) -> eyre::Result<GitRev> {
     match (from, base) {
         (Some(from), _) => resolve_git_ref(from, source),
         (None, Some(_)) => Ok(GitRev::Worktree),
@@ -163,14 +159,14 @@ fn make_from(
     }
 }
 
-fn make_to(to: Option<String>, source: &Source) -> anyhow::Result<GitRev> {
+fn make_to(to: Option<String>, source: &Source) -> eyre::Result<GitRev> {
     match to {
         Some(to) => resolve_git_ref(to, source),
         None => Ok(GitRev::Worktree),
     }
 }
 
-fn resolve_git_ref(orig_ref: String, source: &Source) -> anyhow::Result<GitRev> {
+fn resolve_git_ref(orig_ref: String, source: &Source) -> eyre::Result<GitRev> {
     let path_in_repo = match source {
         Source::FlakeCurrentDir => Path::new("."),
         Source::File(path) => path.as_path(),
@@ -179,7 +175,7 @@ fn resolve_git_ref(orig_ref: String, source: &Source) -> anyhow::Result<GitRev> 
     Ok(GitRev::Rev { orig_ref, rev })
 }
 
-fn get_default_attr_paths(source: &Source, nixos: bool) -> anyhow::Result<Vec<String>> {
+fn get_default_attr_paths(source: &Source, nixos: bool) -> eyre::Result<Vec<String>> {
     Ok(match source {
         Source::FlakeCurrentDir if nixos => nix::get_current_flake_nixos_configurations()?,
         Source::FlakeCurrentDir => nix::get_current_flake_packages()?,
@@ -199,7 +195,7 @@ fn attr_path_from_args(attr_path: String, nixos: bool, source: &Source) -> AttrP
     }
 }
 
-fn build_thread_pool(eval_jobs: isize) -> anyhow::Result<Option<ThreadPool>> {
+fn build_thread_pool(eval_jobs: isize) -> eyre::Result<Option<ThreadPool>> {
     let num_threads: NonZero<usize> = match eval_jobs {
         1.. => {
             NonZero::new(usize::try_from(eval_jobs).expect("positive isize must fit into usize"))
@@ -207,7 +203,7 @@ fn build_thread_pool(eval_jobs: isize) -> anyhow::Result<Option<ThreadPool>> {
         }
         ..=0 => {
             let available: usize = std::thread::available_parallelism()
-                .context("failed to query the number of available threads")?
+                .wrap_err("failed to query the number of available threads")?
                 .get();
             log::debug!("Available parallelism: {available}");
             let reduce_by: usize = eval_jobs.unsigned_abs();
@@ -226,7 +222,7 @@ fn build_thread_pool(eval_jobs: isize) -> anyhow::Result<Option<ThreadPool>> {
             ThreadPoolBuilder::new()
                 .num_threads(num_threads)
                 .build()
-                .context("failed to initialize a thread pool")
+                .wrap_err("failed to initialize a thread pool")
                 .map(Some)
         }
     }
