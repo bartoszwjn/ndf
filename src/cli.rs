@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::ExitCode};
 
 use clap::{Parser, ValueEnum};
 
@@ -10,7 +10,7 @@ const AFTER_HELP: &str = concat![
 /// Compare Nix derivations between commits.
 #[derive(Clone, Debug, Parser)]
 #[command(version, after_help(AFTER_HELP))]
-pub(crate) struct Cli {
+pub struct Cli {
     /// Compare all other attribute paths to this one.
     #[arg(long)]
     pub(crate) lhs: Option<String>,
@@ -76,4 +76,10 @@ pub(crate) enum DiffProgram {
     Nvd,
     /// Do not diff the derivations, only check if they are identical.
     None,
+}
+
+impl Cli {
+    pub fn run(self) -> anyhow::Result<ExitCode> {
+        crate::run(self) // TODO: move stuff out of lib.rs
+    }
 }

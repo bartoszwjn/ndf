@@ -4,16 +4,15 @@ use std::{
     process::ExitCode,
 };
 
-use anstream::{eprintln, print, println};
+use anstream::{print, println};
 use anyhow::Context as _;
-use clap::Parser as _;
 use rayon::{
     ThreadPool, ThreadPoolBuilder,
     iter::{IntoParallelRefIterator as _, ParallelIterator as _},
 };
 
 use crate::{
-    cli::{Cli, DiffProgram},
+    cli::DiffProgram,
     color::{GREEN_BOLD, RED_BOLD},
     command::Cmd,
     spec::{AttrPath, DiffSpec, GitRev, Source},
@@ -28,19 +27,8 @@ mod nix;
 mod spec;
 mod summary;
 
-fn main() -> ExitCode {
-    let args = Cli::parse(); // on error returns with exit code 2
-    env_logger::init();
-    match run(args) {
-        Ok(exit_code) => exit_code,
-        // In case of an unwinding panic the exit code is 101.
-        // Aborting panic raises SIGABRT (6).
-        Err(err) => {
-            eprintln!("{RED_BOLD}error:{RED_BOLD:#} {err}");
-            ExitCode::from(2)
-        }
-    }
-}
+#[doc(hidden)]
+pub use cli::Cli;
 
 fn run(args: Cli) -> anyhow::Result<ExitCode> {
     let eval_jobs = args.eval_jobs;
