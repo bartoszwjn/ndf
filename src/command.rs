@@ -5,7 +5,8 @@ use std::{
     process::{Command, Stdio},
 };
 
-use eyre::WrapErr;
+use color_eyre::{Section, SectionExt};
+use eyre::{WrapErr, eyre};
 use serde::de::DeserializeOwned;
 
 #[derive(Debug)]
@@ -66,37 +67,35 @@ impl Cmd {
     }
 
     pub(crate) fn output(&mut self) -> eyre::Result<Vec<u8>> {
+        Ok(self.get_output()?.stdout)
+    }
+
+    pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
+        let output = self.get_output()?;
+        serde_json::from_slice(&output.stdout)
+            .wrap_err("failed to decode output of external command")
+            .with_context_from_cmd(self)
+            .with_context_from_output(&output)
+    }
+
+    fn get_output(&mut self) -> eyre::Result<std::process::Output> {
         log::debug!("executing command: {}", show_cmd(&self.inner));
         let output = self
             .inner
             .output()
-            .wrap_err_with(|| format!("failed to run {}", show_cmd(&self.inner)))?;
+            .wrap_err("failed to run external command")
+            .with_context_from_cmd(self)?;
 
         if !output.status.success() {
-            let mut msg = format!(
-                "external command did not finish successfully\ncommand: {}\n{}\n",
-                show_cmd(&self.inner),
+            return Err(eyre!(
+                "external command did not finish successfully ({})",
                 output.status,
-            );
-            if !output.stdout.is_empty() {
-                msg.push_str("stdout:\n");
-                msg.push_str(&String::from_utf8_lossy(&output.stdout));
-                msg.push('\n');
-            }
-            if !output.stderr.is_empty() {
-                msg.push_str("stderr:\n");
-                msg.push_str(&String::from_utf8_lossy(&output.stderr));
-                msg.push('\n');
-            }
-            return Err(eyre::Error::msg(msg));
+            )
+            .with_context_from_cmd(self)
+            .with_context_from_output(&output));
         }
 
-        Ok(output.stdout)
-    }
-
-    pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
-        serde_json::from_slice(&self.output()?)
-            .wrap_err_with(|| format!("failed to decode output of {}", show_cmd(&self.inner)))
+        Ok(output)
     }
 }
 
@@ -117,5 +116,33 @@ fn show_arg(arg: &OsStr) -> Cow<'_, str> {
         Cow::Owned(escaped)
     } else {
         arg
+    }
+}
+
+trait ContextExt {
+    type Return;
+
+    fn with_context_from_cmd(self, cmd: &Cmd) -> Self::Return;
+    fn with_context_from_output(self, output: &std::process::Output) -> Self::Return;
+}
+
+impl<T: Section<Return = T>> ContextExt for T {
+    type Return = T::Return;
+
+    fn with_context_from_cmd(self, cmd: &Cmd) -> Self::Return {
+        self.with_section(|| show_cmd(&cmd.inner).header("Command:"))
+    }
+
+    fn with_context_from_output(self, output: &std::process::Output) -> Self::Return {
+        self.with_section(|| {
+            String::from_utf8_lossy(&output.stdout)
+                .into_owned()
+                .header("Captured stdout:")
+        })
+        .with_section(|| {
+            String::from_utf8_lossy(&output.stderr)
+                .into_owned()
+                .header("Captured stderr:")
+        })
     }
 }
