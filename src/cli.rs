@@ -1,6 +1,11 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{num::NonZero, path::PathBuf, process::ExitCode};
 
+use anstream::{print, println};
+use anyhow::Context;
 use clap::{Parser, ValueEnum};
+use rayon::{ThreadPool, ThreadPoolBuilder};
+
+use crate::{diff_spec::DiffSpec, eval};
 
 const AFTER_HELP: &str = concat![
     "Exit code is 0 if all derivations are the same, 1 if any are different,",
@@ -80,6 +85,57 @@ pub(crate) enum DiffProgram {
 
 impl Cli {
     pub fn run(self) -> anyhow::Result<ExitCode> {
-        crate::run(self) // TODO: move stuff out of lib.rs
+        let eval_jobs = self.eval_jobs;
+        let spec = DiffSpec::from_args(self)?;
+
+        println!("{spec}");
+
+        let thread_pool = build_thread_pool(eval_jobs)?;
+        let summary = eval::eval_and_compare_paths(&spec, thread_pool)?;
+
+        print!("{summary}");
+
+        let all_equal = summary
+            .items
+            .iter()
+            .all(|item| item.old_drv_path == item.new_drv_path);
+        Ok(if all_equal {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::from(1)
+        })
+    }
+}
+
+fn build_thread_pool(eval_jobs: isize) -> anyhow::Result<Option<ThreadPool>> {
+    let num_threads: NonZero<usize> = match eval_jobs {
+        1.. => {
+            NonZero::new(usize::try_from(eval_jobs).expect("positive isize must fit into usize"))
+                .expect("value is positive")
+        }
+        ..=0 => {
+            let available: usize = std::thread::available_parallelism()
+                .context("failed to query the number of available threads")?
+                .get();
+            log::debug!("Available parallelism: {available}");
+            let reduce_by: usize = eval_jobs.unsigned_abs();
+            NonZero::new(available.saturating_sub(reduce_by)).unwrap_or(NonZero::<usize>::MIN)
+        }
+    };
+
+    match num_threads.get() {
+        0 => unreachable!(),
+        1 => {
+            log::debug!("Requested parallelism of 1, using only the current thread");
+            Ok(None)
+        }
+        num_threads @ 2.. => {
+            log::debug!("Starting a thread pool with {num_threads} threads");
+            ThreadPoolBuilder::new()
+                .num_threads(num_threads)
+                .build()
+                .context("failed to initialize a thread pool")
+                .map(Some)
+        }
     }
 }
