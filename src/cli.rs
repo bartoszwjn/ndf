@@ -12,32 +12,42 @@ const AFTER_HELP: &str = concat![
     " and something other than 0 or 1 in case of an error.",
 ];
 
-/// Compare Nix derivations between commits.
+/// Compare Nix derivations between two revisions.
 #[derive(Clone, Debug, Parser)]
 #[command(version, after_help(AFTER_HELP))]
 pub struct Cli {
+    /// Attribute paths to compare.
+    ///
+    /// Each path is compared between the revisions specified with `--from` and `--to`.
+    ///
+    /// By default, these paths are interpreted as flake output attributes.
+    #[arg()]
+    pub(crate) attr_paths: Vec<String>,
+
+    /// Report changes from this revision.
+    ///
+    /// When omitted defaults to:
+    /// - HEAD if '--base' is not specified,
+    /// - current worktree otherwise.
+    #[arg(short = 'f', long, verbatim_doc_comment)]
+    pub(crate) from: Option<String>,
+
+    /// Report changes to this revision.
+    ///
+    /// When omitted defaults to the current worktree.
+    #[arg(short = 't', long)]
+    pub(crate) to: Option<String>,
+
     /// Compare all other attribute paths to this one.
     #[arg(long)]
-    pub(crate) lhs: Option<String>,
+    pub(crate) base: Option<String>,
 
-    /// Original Git revision to compare against.
-    ///
-    /// When omitted, use HEAD if '--lhs' is not specified, and the current worktree otherwise.
-    #[arg(short, long)]
-    pub(crate) old: Option<String>,
-
-    /// New Git revision to compare against the old one.
-    ///
-    /// When omitted, use the current worktree.
-    #[arg(short, long)]
-    pub(crate) new: Option<String>,
-
-    /// Program to use for comparing derivations.
-    #[arg(short, long, default_value = "none")]
-    pub(crate) program: DiffProgram,
+    /// Program used for comparing derivations.
+    #[arg(long, default_value = "none")]
+    pub(crate) tool: DiffTool,
 
     /// Interpret paths as attribute paths relative to the Nix expression in the given file.
-    #[arg(short, long)]
+    #[arg(long)]
     pub(crate) file: Option<PathBuf>,
 
     /// Interpret paths as attribute paths relative to the given flake reference.
@@ -49,9 +59,9 @@ pub struct Cli {
 
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
-    /// Each '<ATTR_PATH>' will be treated as if '<ATTR_PATH>.config.system.build.toplevel'
-    /// was passed instead ('nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel'
-    /// when working with flake outputs).
+    /// Each '<ATTR_PATH>' will be treated
+    /// as if '<ATTR_PATH>.config.system.build.toplevel' was passed instead
+    /// ('nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel' for flake outputs).
     #[arg(long)]
     pub(crate) nixos: bool,
 
@@ -59,28 +69,17 @@ pub struct Cli {
     ///
     /// Zero (the default) means "as many as there are available threads",
     /// a negative number '-N' means "N fewer than the number of available threads".
-    #[arg(long, default_value = "0")]
-    pub(crate) eval_jobs: isize,
-
-    /// Attribute paths to compare.
-    ///
-    /// Each path is compared to itself between the old and new revision,
-    /// unless '--lhs' is specified.
-    ///
-    /// These are interpreted as flake output attributes, unless overridden by other options.
-    #[arg()]
-    pub(crate) attr_paths: Vec<String>,
+    #[arg(long, default_value_t = 0)]
+    eval_jobs: isize,
 }
 
 /// Program used to compare derivations.
 #[derive(Clone, Copy, Debug, ValueEnum)]
-pub(crate) enum DiffProgram {
-    /// Use nix-diff to compare derivations.
-    NixDiff,
-    /// Build the derivations and use nvd to compare derivation outputs.
-    Nvd,
+pub(crate) enum DiffTool {
     /// Do not diff the derivations, only check if they are identical.
     None,
+    /// Use nix-diff to compare derivations.
+    NixDiff,
 }
 
 impl Cli {

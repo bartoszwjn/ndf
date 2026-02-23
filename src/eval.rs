@@ -20,19 +20,19 @@ pub(crate) struct EvalSpec<'spec> {
 }
 
 impl<'spec> EvalSpec<'spec> {
-    pub(crate) fn lhs(spec: &'spec DiffSpec, attr_path: &'spec AttrPath) -> Self {
+    pub(crate) fn lhs(spec: &'spec DiffSpec, rhs_attr_path: &'spec AttrPath) -> Self {
         EvalSpec {
             source: &spec.source,
-            git_rev: &spec.old_rev,
-            attr_path,
+            git_rev: &spec.from,
+            attr_path: spec.base.as_ref().unwrap_or(rhs_attr_path),
         }
     }
 
-    pub(crate) fn rhs(spec: &'spec DiffSpec, attr_path: &'spec AttrPath) -> Self {
+    pub(crate) fn rhs(spec: &'spec DiffSpec, rhs_attr_path: &'spec AttrPath) -> Self {
         EvalSpec {
             source: &spec.source,
-            git_rev: &spec.new_rev,
-            attr_path,
+            git_rev: &spec.to,
+            attr_path: rhs_attr_path,
         }
     }
 
@@ -78,17 +78,11 @@ fn eval_and_compare_paths_parallel(
     thread_pool: ThreadPool,
 ) -> anyhow::Result<Vec<SummaryItem>> {
     // Evaluate everything once, then get results from a map.
-    let eval_jobs: HashSet<EvalSpec> = {
-        let eval_jobs_rhs = spec.attr_paths.iter().map(|path| EvalSpec::rhs(spec, path));
-        match &spec.common_lhs {
-            Some(lhs) => std::iter::once(EvalSpec::lhs(spec, lhs))
-                .chain(eval_jobs_rhs)
-                .collect(),
-            None => (spec.attr_paths.iter().map(|path| EvalSpec::lhs(spec, path)))
-                .chain(eval_jobs_rhs)
-                .collect(),
-        }
-    };
+    let eval_jobs: HashSet<EvalSpec> = spec
+        .attr_paths
+        .iter()
+        .flat_map(|path| [EvalSpec::lhs(spec, path), EvalSpec::rhs(spec, path)])
+        .collect();
     let mut cached_results: HashMap<EvalSpec, anyhow::Result<String>> =
         thread_pool.install(|| eval_jobs.par_iter().map(|job| (*job, job.run())).collect());
     let mut get_drv_path = |eval_spec| {

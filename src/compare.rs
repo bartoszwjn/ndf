@@ -1,7 +1,7 @@
 use anstream::println;
 
 use crate::{
-    cli::DiffProgram,
+    cli::DiffTool,
     color::{GREEN_BOLD, RED_BOLD},
     command::Cmd,
     diff_spec::{AttrPath, DiffSpec},
@@ -14,26 +14,24 @@ pub(crate) fn compare_paths<'spec>(
     spec: &'spec DiffSpec,
     mut get_drv_path: impl FnMut(EvalSpec<'spec>) -> anyhow::Result<String>,
 ) -> anyhow::Result<SummaryItem> {
-    let attr_path_l = spec.common_lhs.as_ref().unwrap_or(attr_path);
-    let lhs_spec = EvalSpec::lhs(spec, attr_path_l);
+    let lhs_spec = EvalSpec::lhs(spec, attr_path);
     let rhs_spec = EvalSpec::rhs(spec, attr_path);
     let old_drv_path = get_drv_path(lhs_spec)?;
     let new_drv_path = get_drv_path(rhs_spec)?;
 
-    match spec.program {
-        DiffProgram::None => {}
-        DiffProgram::NixDiff => {
+    match spec.tool {
+        DiffTool::None => {}
+        DiffTool::NixDiff => {
             if old_drv_path != new_drv_path {
                 print_pair_cmp(lhs_spec, rhs_spec);
                 run_nix_diff(&old_drv_path, &new_drv_path)?;
                 println!();
             }
         }
-        DiffProgram::Nvd => todo!("nvd diff"),
     }
 
     Ok(SummaryItem {
-        common_lhs: spec.common_lhs.clone(),
+        base: spec.base.clone(),
         attr_path: attr_path.clone(),
         old_drv_path,
         new_drv_path,

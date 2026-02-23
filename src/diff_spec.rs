@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
-    cli::{Cli, DiffProgram},
+    cli::{Cli, DiffTool},
     color::{BLUE, BOLD, CYAN, GREEN, MAGENTA, YELLOW},
     git, nix,
 };
@@ -9,10 +9,10 @@ use crate::{
 #[derive(Clone, Debug)]
 pub(crate) struct DiffSpec {
     pub(crate) source: Source,
-    pub(crate) old_rev: GitRev,
-    pub(crate) new_rev: GitRev,
-    pub(crate) program: DiffProgram,
-    pub(crate) common_lhs: Option<AttrPath>,
+    pub(crate) from: GitRev,
+    pub(crate) to: GitRev,
+    pub(crate) tool: DiffTool,
+    pub(crate) base: Option<AttrPath>,
     pub(crate) attr_paths: Vec<AttrPath>,
 }
 
@@ -41,13 +41,13 @@ impl DiffSpec {
             (Some(_), Some(_)) => unreachable!("--file and --flake are mutually exclusive"),
         };
 
-        let old_rev = GitRef::old_from_args(args.old, &args.lhs).resolve(&source)?;
-        let new_rev = GitRef::new_from_args(args.new).resolve(&source)?;
-        let program = args.program;
+        let from = GitRef::make_from(args.from, &args.base).resolve(&source)?;
+        let to = GitRef::make_to(args.to).resolve(&source)?;
+        let tool = args.tool;
 
-        let common_lhs = args
-            .lhs
-            .map(|lhs| attr_path_from_args(lhs, args.nixos, &source));
+        let base = args
+            .base
+            .map(|base| attr_path_from_args(base, args.nixos, &source));
 
         let attr_paths = {
             let attr_paths = if args.attr_paths.is_empty() {
@@ -63,10 +63,10 @@ impl DiffSpec {
 
         Ok(Self {
             source,
-            old_rev,
-            new_rev,
-            program,
-            common_lhs,
+            from,
+            to,
+            tool,
+            base,
             attr_paths,
         })
     }
@@ -79,17 +79,17 @@ enum GitRef {
 }
 
 impl GitRef {
-    fn old_from_args(old: Option<String>, lhs: &Option<String>) -> Self {
-        match (old, lhs) {
-            (Some(old), _) => GitRef::Ref(old),
+    fn make_from(from: Option<String>, base: &Option<String>) -> Self {
+        match (from, base) {
+            (Some(from), _) => GitRef::Ref(from),
             (None, Some(_)) => GitRef::Worktree,
             (None, None) => GitRef::Ref("HEAD".to_owned()),
         }
     }
 
-    fn new_from_args(new: Option<String>) -> Self {
-        match new {
-            Some(new) => GitRef::Ref(new),
+    fn make_to(to: Option<String>) -> Self {
+        match to {
+            Some(to) => GitRef::Ref(to),
             None => GitRef::Worktree,
         }
     }
@@ -145,18 +145,17 @@ impl std::fmt::Display for DiffSpec {
             }
         }
 
-        writeln!(f, "{} {}", header!("OldRev"), self.old_rev)?;
-        writeln!(f, "{} {}", header!("NewRev"), self.new_rev)?;
+        writeln!(f, "{} {}", header!("From"), self.from)?;
+        writeln!(f, "{} {}", header!("To"), self.to)?;
 
-        let program = match self.program {
-            DiffProgram::NixDiff => "nix-diff",
-            DiffProgram::Nvd => "nvd",
-            DiffProgram::None => "none",
+        let tool = match self.tool {
+            DiffTool::None => "none",
+            DiffTool::NixDiff => "nix-diff",
         };
-        writeln!(f, "{} {}", header!("Program"), program)?;
+        writeln!(f, "{} {}", header!("Tool"), tool)?;
 
-        if let Some(lhs) = &self.common_lhs {
-            writeln!(f, "{} {}", header!("Lhs"), lhs)?;
+        if let Some(base) = &self.base {
+            writeln!(f, "{} {}", header!("Base"), base)?;
         }
         writeln!(f, "{}", header!("AttrPaths"))?;
         for attr_path in &self.attr_paths {
