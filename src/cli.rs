@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     num::NonZero,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -6,7 +7,7 @@ use std::{
 
 use anstream::{print, println};
 use clap::{Parser, ValueEnum};
-use eyre::WrapErr;
+use eyre::{WrapErr, eyre};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
@@ -56,7 +57,7 @@ pub struct Cli {
 
     /// Interpret paths as attribute paths relative to the Nix expression in the given file.
     #[arg(long)]
-    file: Option<PathBuf>,
+    file: Option<OsString>,
 
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
@@ -109,38 +110,55 @@ impl Cli {
     fn build_diff_spec(self) -> eyre::Result<DiffSpec> {
         let source = match self.file {
             None => Source::FlakeCurrentDir,
-            Some(path) => Source::File(path),
-        };
-
-        let from = make_from(self.from, &source, &self.base)?;
-        let to = make_to(self.to, &source)?;
-        let tool = self.tool;
-
-        let base = self
-            .base
-            .map(|base| attr_path_from_args(base, self.nixos, &source));
-
-        let attr_paths = {
-            let attr_paths = if self.attr_paths.is_empty() {
-                get_default_attr_paths(&source, self.nixos)?
-            } else {
-                self.attr_paths
-            };
-            attr_paths
-                .into_iter()
-                .map(|attr_path| attr_path_from_args(attr_path, self.nixos, &source))
-                .collect()
+            Some(file) => Source::File(validate_file_argument(file)?),
         };
 
         Ok(DiffSpec {
+            from: make_from(self.from, &source, &self.base)?,
+            to: make_to(self.to, &source)?,
+            tool: self.tool,
+            base: self
+                .base
+                .map(|base| attr_path_from_args(base, self.nixos, &source)),
+            attr_paths: {
+                let attr_paths = if self.attr_paths.is_empty() {
+                    get_default_attr_paths(&source, self.nixos)
+                        .wrap_err("failed to determine default attribute paths")?
+                } else {
+                    self.attr_paths
+                };
+                attr_paths
+                    .into_iter()
+                    .map(|attr_path| attr_path_from_args(attr_path, self.nixos, &source))
+                    .collect()
+            },
             source,
-            from,
-            to,
-            tool,
-            base,
-            attr_paths,
         })
     }
+}
+
+fn validate_file_argument(file: OsString) -> eyre::Result<PathBuf> {
+    let s = file.to_string_lossy();
+    let wrap_err =
+        |e: eyre::Report| e.wrap_err(format!("invalid value for option '--file': {s:?}"));
+
+    if file.is_empty() {
+        return Err(wrap_err(eyre!("empty paths are not supported")));
+    }
+    if s.starts_with('<') && s.ends_with('>') {
+        return Err(wrap_err(eyre!(
+            "search paths (paths surrounded by '<' and '>') are not supported"
+        )));
+    }
+    for prefix in ["http://", "https://", "flake:", "channel:"] {
+        if s.starts_with(prefix) {
+            return Err(wrap_err(eyre!(
+                "paths starting with {prefix:?} are not supported"
+            )));
+        }
+    }
+
+    Ok(PathBuf::from(file))
 }
 
 fn make_from(from: Option<String>, source: &Source, base: &Option<String>) -> eyre::Result<GitRev> {

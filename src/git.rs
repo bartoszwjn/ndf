@@ -7,7 +7,7 @@ use crate::command::Cmd;
 pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> eyre::Result<String> {
     let path_metadata = path_in_repo
         .metadata()
-        .wrap_err_with(|| format!("failed to query metadata of {}", path_in_repo.display()))?;
+        .wrap_err_with(|| format!("failed to query metadata of {:?}", path_in_repo))?;
     let dir_in_repo = if path_metadata.is_dir() {
         path_in_repo
     } else {
