@@ -34,7 +34,7 @@ impl std::fmt::Display for DiffSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         macro_rules! header {
             ($name:expr) => {
-                format_args!("{BOLD}{: <10}{BOLD:#}", format!("{}:", $name))
+                format_args!("{BOLD}{: <6}{BOLD:#}", format!("{}:", $name))
             };
         }
 
@@ -57,7 +57,7 @@ impl std::fmt::Display for DiffSpec {
         if let Some(base) = &self.base {
             writeln!(f, "{} {}", header!("Base"), base)?;
         }
-        writeln!(f, "{}", header!("AttrPaths"))?;
+        writeln!(f, "{}", header!("Attribute paths"))?;
         for attr_path in &self.attr_paths {
             writeln!(f, "  {attr_path}")?;
         }
