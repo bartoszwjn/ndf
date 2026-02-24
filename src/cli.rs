@@ -15,10 +15,10 @@ use crate::{
     eval, git, nix,
 };
 
-const AFTER_HELP: &str = concat![
-    "Exit code is 0 if all derivations are the same, 1 if any are different,",
-    " and something other than 0 or 1 in case of an error.",
-];
+const AFTER_HELP: &str = "\
+    Exit code is 0 if all derivations are the same, 1 if any are different, \
+    and something other than 0 or 1 in case of an error.\
+";
 
 /// Compare Nix derivations between two revisions.
 #[derive(Clone, Debug, Parser)]
