@@ -1,8 +1,11 @@
 use std::path::Path;
 
+use eyre::{WrapErr, bail};
+
 use crate::{
     command::Cmd,
     diff_spec::{AttrPath, GitRev, Source},
+    git,
 };
 
 fn get_current_system() -> eyre::Result<String> {
@@ -49,27 +52,61 @@ pub(crate) fn get_drv_path(
     git_rev: &GitRev,
     attr_path: &AttrPath,
 ) -> eyre::Result<String> {
+    let mut cmd = Cmd::nix();
+    cmd.args([
+        "eval",
+        // Eval cache hardly works, sometimes it even seems to make things slower.
+        // It also causes Nix to report "SQLite database is busy" errors
+        // when running multiple evaluations in parallel.
+        "--no-eval-cache",
+        "--json",
+        "--apply",
+        "v: v.drvPath",
+    ]);
+
     match source {
         Source::FlakeCurrentDir => {
             let flake_ref = match git_rev {
                 GitRev::Worktree => String::from(".#"),
                 GitRev::Rev { rev, .. } => format!(".?rev={rev}#"),
             } + &attr_path.0;
-            Cmd::nix()
-                .args([
-                    "eval",
-                    // Eval cache hardly works, sometimes it even seems to make things slower.
-                    // It also causes Nix to report "SQLite database is busy" errors
-                    // when running multiple evaluations in parallel.
-                    "--no-eval-cache",
-                    "--json",
-                    "--apply",
-                    "v: v.drvPath",
-                    "--",
-                    &flake_ref,
-                ])
-                .output_json()
+            cmd.args(["--", &flake_ref]).output_json()
         }
-        Source::File(_) => todo!("get drv path from file"),
+        Source::File(path) => match git_rev {
+            GitRev::Worktree => cmd
+                .arg("--file")
+                .arg(path)
+                .args(["--", &attr_path.0])
+                .output_json(),
+            GitRev::Rev { rev, .. } => {
+                let repo_root = git::get_repo_root(path)?;
+                let path_absolute = path
+                    .canonicalize()
+                    .wrap_err_with(|| format!("failed to resolve {:?}", path))?;
+                let Ok(path_from_repo_root) = path_absolute.strip_prefix(&repo_root) else {
+                    bail!(
+                        "Path to repository root reported by 'git' \
+                        is not a prefix of the given file path {path_absolute:?}"
+                    );
+                };
+
+                const EXPR: &str = "{repoRoot, pathInRepo, rev}: \
+                    let \
+                      repo = builtins.fetchGit { url = /. + repoRoot; inherit rev; }; \
+                      path = if pathInRepo == \"\" then repo else repo + \"/${pathInRepo}\"; \
+                      autoApply = x: if builtins.isFunction x then x {} else x; \
+                    in \
+                    autoApply (import path)";
+
+                cmd.args(["--impure", "--expr", EXPR])
+                    .args(["--argstr", "repoRoot"])
+                    .arg(&repo_root)
+                    .args(["--argstr", "pathInRepo"])
+                    .arg(path_from_repo_root)
+                    .args(["--argstr", "rev", rev])
+                    .args(["--", &attr_path.0])
+                    .output_json()
+            }
+        },
     }
 }
