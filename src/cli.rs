@@ -12,7 +12,7 @@ use eyre::{WrapErr, bail, eyre};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
-    diff_spec::{AttrPath, DiffSpec, FlakePath, GitRev, Source},
+    diff_spec::{AttrPath, DiffSpec, FlakePath, Revision, Source},
     eval, git, nix,
 };
 
@@ -229,27 +229,25 @@ fn make_from(
     from: Option<String>,
     base: &Option<String>,
     repo_root: &Path,
-) -> eyre::Result<GitRev> {
+) -> eyre::Result<Revision> {
     match (from, base) {
         (Some(from), _) => resolve_git_commit(from, repo_root),
-        (None, Some(_)) => Ok(GitRev::Worktree),
+        (None, Some(_)) => Ok(Revision::GitWorktree),
         (None, None) => resolve_git_commit("HEAD".to_owned(), repo_root),
     }
 }
 
-fn make_to(to: Option<String>, repo_root: &Path) -> eyre::Result<GitRev> {
+fn make_to(to: Option<String>, repo_root: &Path) -> eyre::Result<Revision> {
     match to {
         Some(to) => resolve_git_commit(to, repo_root),
-        None => Ok(GitRev::Worktree),
+        None => Ok(Revision::GitWorktree),
     }
 }
 
-fn resolve_git_commit(commit: String, repo_root: &Path) -> eyre::Result<GitRev> {
-    let rev = git::resolve_commit(&commit, repo_root)?;
-    Ok(GitRev::Rev {
-        orig_ref: commit,
-        rev,
-    })
+fn resolve_git_commit(commit: String, repo_root: &Path) -> eyre::Result<Revision> {
+    let commit_id = git::resolve_commit(&commit, repo_root)?;
+    let display = git::show_commit(&commit_id, repo_root)?;
+    Ok(Revision::GitRevision { commit_id, display })
 }
 
 fn get_default_attr_paths(source: &Source, nixos: bool) -> eyre::Result<Vec<String>> {

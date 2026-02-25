@@ -55,6 +55,26 @@ pub(crate) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<Str
     Ok(output)
 }
 
+pub(crate) fn show_commit(commit_id: &str, repo_root: &Path) -> eyre::Result<String> {
+    let mut output = Cmd::git()
+        .args([
+            "show",
+            "--color=always",
+            "--pretty=oneline",
+            "--abbrev-commit",
+            "--decorate=short",
+            "--no-patch",
+            "--end-of-options",
+            commit_id,
+        ])
+        .current_dir(repo_root)
+        .output()?;
+    strip_trailing_newline(&mut output)?;
+
+    Ok(String::from_utf8(output)
+        .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()))
+}
+
 fn strip_trailing_newline(git_output: &mut Vec<u8>) -> eyre::Result<()> {
     match git_output.last() {
         Some(b'\n') => {

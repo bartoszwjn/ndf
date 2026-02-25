@@ -7,7 +7,7 @@ use eyre::bail;
 
 use crate::{
     cli::DiffTool,
-    color::{BLUE, BOLD, CYAN, GREEN, MAGENTA, YELLOW},
+    color::{BLUE, BOLD, CYAN, MAGENTA},
 };
 
 #[derive(Clone, Debug)]
@@ -15,8 +15,8 @@ pub(crate) struct DiffSpec {
     pub(crate) source: Source,
     /// Absolute, canonicalized path to repository root.
     pub(crate) repo: PathBuf,
-    pub(crate) from: GitRev,
-    pub(crate) to: GitRev,
+    pub(crate) from: Revision,
+    pub(crate) to: Revision,
     pub(crate) tool: DiffTool,
     pub(crate) base: Option<AttrPath>,
     pub(crate) attr_paths: Vec<AttrPath>,
@@ -36,9 +36,9 @@ pub(crate) enum Source {
 pub(crate) struct FlakePath(PathBuf);
 
 #[derive(Clone, Debug)]
-pub(crate) enum GitRev {
-    Rev { orig_ref: String, rev: String },
-    Worktree,
+pub(crate) enum Revision {
+    GitRevision { commit_id: String, display: String },
+    GitWorktree,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -67,11 +67,11 @@ impl FlakePath {
     }
 }
 
-impl GitRev {
+impl Revision {
     pub(crate) fn commit_id(&self) -> Option<&str> {
         match self {
-            GitRev::Rev { rev, .. } => Some(rev),
-            GitRev::Worktree => None,
+            Revision::GitRevision { commit_id, .. } => Some(commit_id),
+            Revision::GitWorktree => None,
         }
     }
 }
@@ -117,14 +117,12 @@ impl std::fmt::Display for DiffSpec {
     }
 }
 
-impl std::fmt::Display for GitRev {
+impl std::fmt::Display for Revision {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Rev { orig_ref, rev } => {
-                write!(f, "{GREEN}{orig_ref}{GREEN:#} {YELLOW}{rev}{YELLOW:#}")
-            }
+            Self::GitRevision { display, .. } => f.write_str(display),
             // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
-            Self::Worktree => {
+            Self::GitWorktree => {
                 write!(f, "{MAGENTA}[worktree]{MAGENTA:#}")
             }
         }
