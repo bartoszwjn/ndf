@@ -34,7 +34,7 @@ impl<'spec> EvalSpec<'spec> {
     }
 
     pub(crate) fn run(&self, spec: &DiffSpec) -> eyre::Result<String> {
-        nix::get_drv_path(&spec.source, self.commit_id, self.attr_path)
+        nix::get_drv_path(&spec.repo, &spec.source, self.commit_id, self.attr_path)
     }
 }
 

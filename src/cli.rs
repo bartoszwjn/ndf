@@ -1,5 +1,6 @@
 use std::{
-    ffi::OsString,
+    ffi::{OsStr, OsString},
+    fs,
     num::NonZero,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -7,11 +8,11 @@ use std::{
 
 use anstream::{print, println};
 use clap::{Parser, ValueEnum};
-use eyre::{WrapErr, eyre};
+use eyre::{WrapErr, bail, eyre};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
-    diff_spec::{AttrPath, DiffSpec, GitRev, Source},
+    diff_spec::{AttrPath, DiffSpec, FlakePath, GitRev, Source},
     eval, git, nix,
 };
 
@@ -55,8 +56,15 @@ pub struct Cli {
     #[arg(long, default_value = "none")]
     tool: DiffTool,
 
+    /// Interpret paths as attribute paths relative to the flake at the given path.
+    ///
+    /// Only local filesystem paths are supported,
+    /// other flake reference types (e.g. 'github') are not.
+    #[arg(long, default_value = ".")]
+    flake: OsString,
+
     /// Interpret paths as attribute paths relative to the Nix expression in the given file.
-    #[arg(long)]
+    #[arg(long, conflicts_with("flake"))]
     file: Option<OsString>,
 
     /// Interpret paths as attribute paths pointing to NixOS configurations.
@@ -109,13 +117,25 @@ impl Cli {
 
     fn build_diff_spec(self) -> eyre::Result<DiffSpec> {
         let source = match self.file {
-            None => Source::FlakeCurrentDir,
-            Some(file) => Source::File(validate_file_argument(file)?),
+            Some(file) => {
+                assert_eq!(self.flake, ".");
+                Source::File(
+                    validate_file_argument(&file)
+                        .wrap_err_with(|| format!("invalid value for option '--file': {file:?}"))?,
+                )
+            }
+            None => Source::Flake(validate_flake_argument(&self.flake).wrap_err_with(|| {
+                format!("invalid value for option '--flake': {:?}", self.flake)
+            })?),
         };
+        let repo = git::get_repo_root(match &source {
+            Source::Flake(flake_path) => flake_path.path(),
+            Source::File(file_path) => file_path,
+        })?;
 
         Ok(DiffSpec {
-            from: make_from(self.from, &source, &self.base)?,
-            to: make_to(self.to, &source)?,
+            from: make_from(self.from, &self.base, &repo)?,
+            to: make_to(self.to, &repo)?,
             tool: self.tool,
             base: self
                 .base
@@ -133,62 +153,109 @@ impl Cli {
                     .collect()
             },
             source,
+            repo,
         })
     }
 }
 
-fn validate_file_argument(file: OsString) -> eyre::Result<PathBuf> {
+fn validate_flake_argument(flake: &OsStr) -> eyre::Result<FlakePath> {
+    let path = Path::new(flake);
+    // Same as the path-like syntax described in `nix flake --help`.
+    // https://nix.dev/manual/nix/2.33/command-ref/new-cli/nix3-flake.html#path-like-syntax
+    if path.is_relative() && !path.starts_with(Path::new(".")) {
+        bail!("flake paths must be absolute paths or start with './'");
+    }
+
+    let path = path
+        .canonicalize()
+        .wrap_err_with(|| format!("failed to resolve path {path:?}"))?;
+    let metadata = path
+        .metadata()
+        .wrap_err_with(|| format!("failed to query metadata of {path:?}"))?;
+    if !metadata.is_dir() {
+        bail!("{path:?} is not a directory");
+    }
+
+    let mut flake_path = path.clone();
+    loop {
+        flake_path.push("flake.nix");
+        let has_flake_nix = flake_path
+            .try_exists()
+            .wrap_err_with(|| format!("failed to check for existence of {flake_path:?}"))?;
+        flake_path.pop();
+        if has_flake_nix {
+            return FlakePath::new(flake_path);
+        }
+
+        flake_path.push(".git");
+        let has_dot_git = flake_path
+            .try_exists()
+            .wrap_err_with(|| format!("failed to check for existence of {flake_path:?}"))?;
+        flake_path.pop();
+        if has_dot_git || &flake_path == "/" {
+            bail!(
+                "path {path:?} is not part of a flake \
+                (neither it nor its parent directories contain a 'flake.nix' file)"
+            );
+        }
+
+        flake_path.pop();
+    }
+}
+
+fn validate_file_argument(file: &OsStr) -> eyre::Result<PathBuf> {
     let s = file.to_string_lossy();
-    let wrap_err =
-        |e: eyre::Report| e.wrap_err(format!("invalid value for option '--file': {s:?}"));
 
     if file.is_empty() {
-        return Err(wrap_err(eyre!("empty paths are not supported")));
+        return Err(eyre!("empty paths are not supported"));
     }
+    // Reject special forms accepted by `nix`'s `--file` option.
+    // https://docs.lix.systems/manual/lix/2.94/command-ref/nix-build.html#fileish-syntax
     if s.starts_with('<') && s.ends_with('>') {
-        return Err(wrap_err(eyre!(
+        return Err(eyre!(
             "search paths (paths surrounded by '<' and '>') are not supported"
-        )));
+        ));
     }
     for prefix in ["http://", "https://", "flake:", "channel:"] {
         if s.starts_with(prefix) {
-            return Err(wrap_err(eyre!(
-                "paths starting with {prefix:?} are not supported"
-            )));
+            return Err(eyre!("paths starting with {prefix:?} are not supported"));
         }
     }
 
-    Ok(PathBuf::from(file))
+    fs::canonicalize(file).wrap_err_with(|| format!("failed to resolve path {file:?}"))
 }
 
-fn make_from(from: Option<String>, source: &Source, base: &Option<String>) -> eyre::Result<GitRev> {
+fn make_from(
+    from: Option<String>,
+    base: &Option<String>,
+    repo_root: &Path,
+) -> eyre::Result<GitRev> {
     match (from, base) {
-        (Some(from), _) => resolve_git_ref(from, source),
+        (Some(from), _) => resolve_git_commit(from, repo_root),
         (None, Some(_)) => Ok(GitRev::Worktree),
-        (None, None) => resolve_git_ref("HEAD".to_owned(), source),
+        (None, None) => resolve_git_commit("HEAD".to_owned(), repo_root),
     }
 }
 
-fn make_to(to: Option<String>, source: &Source) -> eyre::Result<GitRev> {
+fn make_to(to: Option<String>, repo_root: &Path) -> eyre::Result<GitRev> {
     match to {
-        Some(to) => resolve_git_ref(to, source),
+        Some(to) => resolve_git_commit(to, repo_root),
         None => Ok(GitRev::Worktree),
     }
 }
 
-fn resolve_git_ref(orig_ref: String, source: &Source) -> eyre::Result<GitRev> {
-    let path_in_repo = match source {
-        Source::FlakeCurrentDir => Path::new("."),
-        Source::File(path) => path.as_path(),
-    };
-    let rev = git::resolve_ref(&orig_ref, path_in_repo)?;
-    Ok(GitRev::Rev { orig_ref, rev })
+fn resolve_git_commit(commit: String, repo_root: &Path) -> eyre::Result<GitRev> {
+    let rev = git::resolve_commit(&commit, repo_root)?;
+    Ok(GitRev::Rev {
+        orig_ref: commit,
+        rev,
+    })
 }
 
 fn get_default_attr_paths(source: &Source, nixos: bool) -> eyre::Result<Vec<String>> {
     Ok(match source {
-        Source::FlakeCurrentDir if nixos => nix::get_current_flake_nixos_configurations()?,
-        Source::FlakeCurrentDir => nix::get_current_flake_packages()?,
+        Source::Flake(flake_path) if nixos => nix::get_flake_nixos_configurations(flake_path)?,
+        Source::Flake(flake_path) => nix::get_flake_packages(flake_path)?,
         Source::File(file) => nix::get_file_output_attributes(file)?,
     })
 }
@@ -196,7 +263,7 @@ fn get_default_attr_paths(source: &Source, nixos: bool) -> eyre::Result<Vec<Stri
 fn attr_path_from_args(attr_path: String, nixos: bool, source: &Source) -> AttrPath {
     match (nixos, source) {
         (false, _) => AttrPath(attr_path),
-        (true, Source::FlakeCurrentDir) => {
+        (true, Source::Flake(_)) => {
             let mut attr_path = attr_path;
             attr_path.insert_str(0, "nixosConfigurations.");
             AttrPath(attr_path + ".config.system.build.toplevel")

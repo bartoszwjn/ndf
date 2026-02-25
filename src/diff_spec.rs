@@ -1,4 +1,9 @@
-use std::path::PathBuf;
+use std::{
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+};
+
+use eyre::bail;
 
 use crate::{
     cli::DiffTool,
@@ -8,6 +13,8 @@ use crate::{
 #[derive(Clone, Debug)]
 pub(crate) struct DiffSpec {
     pub(crate) source: Source,
+    /// Absolute, canonicalized path to repository root.
+    pub(crate) repo: PathBuf,
     pub(crate) from: GitRev,
     pub(crate) to: GitRev,
     pub(crate) tool: DiffTool,
@@ -17,9 +24,16 @@ pub(crate) struct DiffSpec {
 
 #[derive(Clone, Debug)]
 pub(crate) enum Source {
-    FlakeCurrentDir,
+    Flake(FlakePath),
+    /// Absolute, canonicalized path to the file.
     File(PathBuf),
 }
+
+/// Absolute, canonicalized path to the directory containing the `flake.nix` file.
+///
+/// Guaranteed to contain only characters that can be used in path-like flake references.
+#[derive(Clone, Debug)]
+pub(crate) struct FlakePath(PathBuf);
 
 #[derive(Clone, Debug)]
 pub(crate) enum GitRev {
@@ -29,6 +43,29 @@ pub(crate) enum GitRev {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct AttrPath(pub(crate) String);
+
+impl FlakePath {
+    pub(crate) fn new(path: PathBuf) -> eyre::Result<Self> {
+        assert!(path.is_absolute());
+        let bytes = path.as_os_str().as_bytes();
+        if let Some(invalid_byte) = bytes.iter().copied().find(|b| !Self::is_valid_byte(b)) {
+            bail!(
+                "flake path contains an invalid character: {}",
+                std::ascii::escape_default(invalid_byte)
+            )
+        }
+        Ok(Self(path))
+    }
+
+    fn is_valid_byte(byte: &u8) -> bool {
+        // https://git.lix.systems/lix-project/lix/src/commit/2.94.0/lix/libexpr/flake/flakeref.cc#L86
+        byte.is_ascii_alphanumeric() || b"-._~!$&'\"()*+,;=/".contains(byte)
+    }
+
+    pub(crate) fn path(&self) -> &Path {
+        self.0.as_ref()
+    }
+}
 
 impl GitRev {
     pub(crate) fn commit_id(&self) -> Option<&str> {
@@ -47,13 +84,18 @@ impl std::fmt::Display for DiffSpec {
             };
         }
 
-        match &self.source {
-            Source::FlakeCurrentDir => writeln!(f, "{} {BLUE}.{BLUE:#}", header!("Flake"))?,
-            Source::File(path) => {
-                writeln!(f, "{} {BLUE}{}{BLUE:#}", header!("File"), path.display())?
-            }
-        }
+        let (source_header, source_path) = match &self.source {
+            Source::Flake(flake_path) => ("Flake", flake_path.path()),
+            Source::File(path) => ("File", path.as_path()),
+        };
+        writeln!(
+            f,
+            "{} {BLUE}{}{BLUE:#}",
+            header!(source_header),
+            source_path.display()
+        )?;
 
+        writeln!(f, "{} {}", header!("Repo"), self.repo.display())?;
         writeln!(f, "{} {}", header!("From"), self.from)?;
         writeln!(f, "{} {}", header!("To"), self.to)?;
 

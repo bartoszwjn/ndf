@@ -1,19 +1,41 @@
-use std::{
-    ffi::OsString,
-    os::unix::ffi::OsStringExt,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use eyre::{WrapErr, bail};
 
 use crate::command::Cmd;
 
-pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> eyre::Result<String> {
-    let dir_in_repo = get_dir_in_repo(path_in_repo)?;
+pub(crate) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
+    assert!(path_in_repo.is_absolute());
 
+    let mut path = path_in_repo.to_owned();
+    let metadata = path
+        .metadata()
+        .wrap_err_with(|| format!("failed to query metadata of {path:?}"))?;
+    if metadata.is_file() {
+        path.pop();
+    }
+    loop {
+        path.push(".git");
+        let has_dot_git = path
+            .try_exists()
+            .wrap_err_with(|| format!("failed to check for existence of {path:?}"))?;
+        path.pop();
+        if has_dot_git {
+            return Ok(path);
+        }
+
+        if &path == "/" {
+            bail!("path {path_in_repo:?} is not part of a Git repository");
+        }
+
+        path.pop();
+    }
+}
+
+pub(crate) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
-        .args(["rev-parse", "--verify", "--end-of-options", git_ref])
-        .current_dir(dir_in_repo)
+        .args(["rev-parse", "--verify", "--end-of-options", commit])
+        .current_dir(repo_root)
         .output()?;
     strip_trailing_newline(&mut output)?;
     let output =
@@ -31,34 +53,6 @@ pub(crate) fn resolve_ref(git_ref: &str, path_in_repo: &Path) -> eyre::Result<St
     );
 
     Ok(output)
-}
-
-pub(crate) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
-    let dir_in_repo = get_dir_in_repo(path_in_repo)?;
-
-    let mut output = Cmd::git()
-        .args(["rev-parse", "--show-toplevel"])
-        .current_dir(dir_in_repo)
-        .output()?;
-    strip_trailing_newline(&mut output)?;
-
-    Ok(PathBuf::from(OsString::from_vec(output)))
-}
-
-fn get_dir_in_repo(path_in_repo: &Path) -> eyre::Result<&Path> {
-    let path_metadata = path_in_repo
-        .metadata()
-        .wrap_err_with(|| format!("failed to query metadata of {:?}", path_in_repo))?;
-
-    if path_metadata.is_dir() {
-        Ok(path_in_repo)
-    } else {
-        match path_in_repo.parent() {
-            Some(parent) if parent.as_os_str().is_empty() => Ok(Path::new(".")),
-            Some(parent) => Ok(parent),
-            None => unreachable!("path points to a non-directory and doesn't have a parent"),
-        }
-    }
 }
 
 fn strip_trailing_newline(git_output: &mut Vec<u8>) -> eyre::Result<()> {

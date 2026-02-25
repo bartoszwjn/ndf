@@ -1,11 +1,8 @@
 use std::path::Path;
 
-use eyre::{WrapErr, bail};
-
 use crate::{
     command::Cmd,
-    diff_spec::{AttrPath, Source},
-    git,
+    diff_spec::{AttrPath, FlakePath, Source},
 };
 
 fn get_current_system() -> eyre::Result<String> {
@@ -20,19 +17,25 @@ fn get_current_system() -> eyre::Result<String> {
         .output_json()
 }
 
-pub(crate) fn get_current_flake_packages() -> eyre::Result<Vec<String>> {
+pub(crate) fn get_flake_packages(flake_path: &FlakePath) -> eyre::Result<Vec<String>> {
     let current_system = get_current_system()?;
     let package_names_fn =
         format!("flake: builtins.attrNames (flake.packages.{current_system} or {{}})");
+    let mut flake_ref = flake_path.path().as_os_str().to_os_string();
+    flake_ref.push("#.");
     Cmd::nix()
-        .args(["eval", "--json", ".#.", "--apply", &package_names_fn])
+        .args(["eval", "--json", "--apply", &package_names_fn, "--"])
+        .arg(flake_ref)
         .output_json()
 }
 
-pub(crate) fn get_current_flake_nixos_configurations() -> eyre::Result<Vec<String>> {
+pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Result<Vec<String>> {
     let nixos_names_fn = "flake: builtins.attrNames (flake.nixosConfigurations or {})";
+    let mut flake_ref = flake_path.path().as_os_str().to_os_string();
+    flake_ref.push("#.");
     Cmd::nix()
-        .args(["eval", "--json", ".#.", "--apply", nixos_names_fn])
+        .args(["eval", "--json", "--apply", nixos_names_fn, "--"])
+        .arg(flake_ref)
         .output_json()
 }
 
@@ -48,6 +51,7 @@ pub(crate) fn get_file_output_attributes(file: &Path) -> eyre::Result<Vec<String
 }
 
 pub(crate) fn get_drv_path(
+    repo_root: &Path,
     source: &Source,
     commit_id: Option<&str>,
     attr_path: &AttrPath,
@@ -65,12 +69,16 @@ pub(crate) fn get_drv_path(
     ]);
 
     match source {
-        Source::FlakeCurrentDir => {
-            let flake_ref = match commit_id {
-                None => String::from(".#"),
-                Some(rev) => format!(".?rev={rev}#"),
-            } + &attr_path.0;
-            cmd.args(["--", &flake_ref]).output_json()
+        Source::Flake(flake_path) => {
+            let mut flake_ref = flake_path.path().as_os_str().to_os_string();
+            if let Some(rev) = commit_id {
+                flake_ref.push("?rev=");
+                flake_ref.push(rev);
+            }
+            flake_ref.push("#");
+            flake_ref.push(&attr_path.0);
+
+            cmd.arg("--").arg(&flake_ref).output_json()
         }
         Source::File(path) => match commit_id {
             None => cmd
@@ -79,15 +87,8 @@ pub(crate) fn get_drv_path(
                 .args(["--", &attr_path.0])
                 .output_json(),
             Some(rev) => {
-                let repo_root = git::get_repo_root(path)?;
-                let path_absolute = path
-                    .canonicalize()
-                    .wrap_err_with(|| format!("failed to resolve {:?}", path))?;
-                let Ok(path_from_repo_root) = path_absolute.strip_prefix(&repo_root) else {
-                    bail!(
-                        "Path to repository root reported by 'git' \
-                        is not a prefix of the given file path {path_absolute:?}"
-                    );
+                let Ok(path_relative) = path.strip_prefix(repo_root) else {
+                    unreachable!("repo_root should be a prefix of the file path");
                 };
 
                 const EXPR: &str = "{repoRoot, pathInRepo, rev}: \
@@ -100,9 +101,9 @@ pub(crate) fn get_drv_path(
 
                 cmd.args(["--impure", "--expr", EXPR])
                     .args(["--argstr", "repoRoot"])
-                    .arg(&repo_root)
+                    .arg(repo_root)
                     .args(["--argstr", "pathInRepo"])
-                    .arg(path_from_repo_root)
+                    .arg(path_relative)
                     .args(["--argstr", "rev", rev])
                     .args(["--", &attr_path.0])
                     .output_json()
