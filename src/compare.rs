@@ -23,7 +23,7 @@ pub(crate) fn compare_paths<'spec>(
         DiffTool::None => {}
         DiffTool::NixDiff => {
             if old_drv_path != new_drv_path {
-                print_pair_cmp(lhs_spec, rhs_spec);
+                print_pair_cmp(lhs_spec.attr_path, rhs_spec.attr_path, spec);
                 run_nix_diff(&old_drv_path, &new_drv_path)?;
                 println!();
             }
@@ -38,19 +38,19 @@ pub(crate) fn compare_paths<'spec>(
     })
 }
 
-fn print_pair_cmp(lhs: EvalSpec, rhs: EvalSpec) {
-    let width_l = unicode_width::UnicodeWidthStr::width(lhs.attr_path.0.as_str());
-    let width_r = unicode_width::UnicodeWidthStr::width(rhs.attr_path.0.as_str());
+fn print_pair_cmp(lhs: &AttrPath, rhs: &AttrPath, spec: &DiffSpec) {
+    let width_l = unicode_width::UnicodeWidthStr::width(lhs.0.as_str());
+    let width_r = unicode_width::UnicodeWidthStr::width(rhs.0.as_str());
     let width = width_l.max(width_r);
     let lhs_pad = width - width_l;
     let rhs_pad = width - width_r;
     println!(
         "{RED_BOLD}-{RED_BOLD:#} {}{:lhs_pad$} {}",
-        lhs.attr_path, "", lhs.git_rev
+        lhs, "", spec.from
     );
     println!(
         "{GREEN_BOLD}+{GREEN_BOLD:#} {}{:rhs_pad$} {}",
-        rhs.attr_path, "", rhs.git_rev
+        rhs, "", spec.to
     );
 }
 

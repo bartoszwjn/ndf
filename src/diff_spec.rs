@@ -15,13 +15,13 @@ pub(crate) struct DiffSpec {
     pub(crate) attr_paths: Vec<AttrPath>,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) enum Source {
     FlakeCurrentDir,
     File(PathBuf),
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) enum GitRev {
     Rev { orig_ref: String, rev: String },
     Worktree,
@@ -29,6 +29,15 @@ pub(crate) enum GitRev {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct AttrPath(pub(crate) String);
+
+impl GitRev {
+    pub(crate) fn commit_id(&self) -> Option<&str> {
+        match self {
+            GitRev::Rev { rev, .. } => Some(rev),
+            GitRev::Worktree => None,
+        }
+    }
+}
 
 impl std::fmt::Display for DiffSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

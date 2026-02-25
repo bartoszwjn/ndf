@@ -4,7 +4,7 @@ use eyre::{WrapErr, bail};
 
 use crate::{
     command::Cmd,
-    diff_spec::{AttrPath, GitRev, Source},
+    diff_spec::{AttrPath, Source},
     git,
 };
 
@@ -49,7 +49,7 @@ pub(crate) fn get_file_output_attributes(file: &Path) -> eyre::Result<Vec<String
 
 pub(crate) fn get_drv_path(
     source: &Source,
-    git_rev: &GitRev,
+    commit_id: Option<&str>,
     attr_path: &AttrPath,
 ) -> eyre::Result<String> {
     let mut cmd = Cmd::nix();
@@ -66,19 +66,19 @@ pub(crate) fn get_drv_path(
 
     match source {
         Source::FlakeCurrentDir => {
-            let flake_ref = match git_rev {
-                GitRev::Worktree => String::from(".#"),
-                GitRev::Rev { rev, .. } => format!(".?rev={rev}#"),
+            let flake_ref = match commit_id {
+                None => String::from(".#"),
+                Some(rev) => format!(".?rev={rev}#"),
             } + &attr_path.0;
             cmd.args(["--", &flake_ref]).output_json()
         }
-        Source::File(path) => match git_rev {
-            GitRev::Worktree => cmd
+        Source::File(path) => match commit_id {
+            None => cmd
                 .arg("--file")
                 .arg(path)
                 .args(["--", &attr_path.0])
                 .output_json(),
-            GitRev::Rev { rev, .. } => {
+            Some(rev) => {
                 let repo_root = git::get_repo_root(path)?;
                 let path_absolute = path
                     .canonicalize()
