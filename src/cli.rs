@@ -36,16 +36,19 @@ pub struct Cli {
 
     /// Report changes from this revision.
     ///
-    /// When omitted defaults to:
-    /// - HEAD if '--base' is not specified,
-    /// - current worktree otherwise.
+    /// If either of `--to` or `--base` is provided, then the default is the same as for `--to`.
+    /// If none of `--to` or `--base` is provided, then the default is:
+    /// - `HEAD~`, if the working tree is clean
+    /// - `HEAD`, if there are uncommitted changes
     #[arg(short = 'f', long, verbatim_doc_comment)]
     from: Option<String>,
 
     /// Report changes to this revision.
     ///
-    /// When omitted defaults to the current worktree.
-    #[arg(short = 't', long)]
+    /// The default is:
+    /// - `HEAD`, if the working tree is clean
+    /// - current worktree, if there are uncommitted changes
+    #[arg(short = 't', long, verbatim_doc_comment)]
     to: Option<String>,
 
     /// Compare all other attribute paths to this one.
@@ -69,16 +72,16 @@ pub struct Cli {
 
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
-    /// Each '<ATTR_PATH>' will be transformed to:
-    /// - '<ATTR_PATH>.config.system.build.toplevel' if '--file' was used,
-    /// - 'nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel' for flake outputs.
+    /// Each `<ATTR_PATH>` will be transformed to:
+    /// - `<ATTR_PATH>.config.system.build.toplevel` if `--file` was used,
+    /// - `nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel` for flake outputs.
     #[arg(long, verbatim_doc_comment)]
     nixos: bool,
 
     /// Maximum number of Nix evaluations to perform in parallel.
     ///
     /// Zero (the default) means "as many as there are available threads",
-    /// a negative number '-N' means "N fewer than the number of available threads".
+    /// a negative number `-N` means "`N` fewer than the number of available threads".
     #[arg(long, default_value_t = 0)]
     eval_jobs: isize,
 }
@@ -116,11 +119,11 @@ impl Cli {
     }
 
     fn build_diff_spec(self) -> eyre::Result<DiffSpec> {
-        let source = match self.file {
+        let source = match &self.file {
             Some(file) => {
                 assert_eq!(self.flake, ".");
                 Source::File(
-                    validate_file_argument(&file)
+                    validate_file_argument(file)
                         .wrap_err_with(|| format!("invalid value for option '--file': {file:?}"))?,
                 )
             }
@@ -133,9 +136,19 @@ impl Cli {
             Source::File(file_path) => file_path,
         })?;
 
+        let mut worktree_status = None;
+        let mut worktree_is_clean = || match &worktree_status {
+            Some(cached) => Ok(*cached),
+            None => {
+                let is_clean = git::working_tree_is_clean(&repo)?;
+                worktree_status = Some(is_clean);
+                Ok(is_clean)
+            }
+        };
+
         Ok(DiffSpec {
-            from: make_from(self.from, &self.base, &repo)?,
-            to: make_to(self.to, &repo)?,
+            from: self.make_from(&repo, &mut worktree_is_clean)?,
+            to: self.make_to(&repo, &mut worktree_is_clean)?,
             tool: self.tool,
             base: self
                 .base
@@ -155,6 +168,43 @@ impl Cli {
             source,
             repo,
         })
+    }
+
+    fn make_from(
+        &self,
+        repo_root: &Path,
+        worktree_is_clean: impl FnOnce() -> eyre::Result<bool>,
+    ) -> eyre::Result<Revision> {
+        let commit = match &self.from {
+            Some(from) => Some(from.as_str()),
+            None => match (
+                self.to.is_some() || self.base.is_some(),
+                worktree_is_clean()?,
+            ) {
+                // Same default as `--to`
+                (true, true) => Some("HEAD"),
+                (true, false) => None,
+                // Parent of the `--to` default
+                (false, true) => Some("HEAD~"),
+                (false, false) => Some("HEAD"),
+            },
+        };
+        resolve_git_commit(commit, repo_root)
+    }
+
+    fn make_to(
+        &self,
+        repo_root: &Path,
+        worktree_is_clean: impl FnOnce() -> eyre::Result<bool>,
+    ) -> eyre::Result<Revision> {
+        let commit = match &self.to {
+            Some(to) => Some(to.as_str()),
+            None => match worktree_is_clean()? {
+                true => Some("HEAD"),
+                false => None,
+            },
+        };
+        resolve_git_commit(commit, repo_root)
     }
 }
 
@@ -225,27 +275,12 @@ fn validate_file_argument(file: &OsStr) -> eyre::Result<PathBuf> {
     fs::canonicalize(file).wrap_err_with(|| format!("failed to resolve path {file:?}"))
 }
 
-fn make_from(
-    from: Option<String>,
-    base: &Option<String>,
-    repo_root: &Path,
-) -> eyre::Result<Revision> {
-    match (from, base) {
-        (Some(from), _) => resolve_git_commit(from, repo_root),
-        (None, Some(_)) => Ok(Revision::GitWorktree),
-        (None, None) => resolve_git_commit("HEAD".to_owned(), repo_root),
-    }
-}
+fn resolve_git_commit(commit: Option<&str>, repo_root: &Path) -> eyre::Result<Revision> {
+    let Some(commit) = commit else {
+        return Ok(Revision::GitWorktree);
+    };
 
-fn make_to(to: Option<String>, repo_root: &Path) -> eyre::Result<Revision> {
-    match to {
-        Some(to) => resolve_git_commit(to, repo_root),
-        None => Ok(Revision::GitWorktree),
-    }
-}
-
-fn resolve_git_commit(commit: String, repo_root: &Path) -> eyre::Result<Revision> {
-    let commit_id = git::resolve_commit(&commit, repo_root)?;
+    let commit_id = git::resolve_commit(commit, repo_root)?;
     let display = git::show_commit(&commit_id, repo_root)?;
     Ok(Revision::GitRevision { commit_id, display })
 }

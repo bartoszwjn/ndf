@@ -32,10 +32,22 @@ pub(crate) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
     }
 }
 
+pub(crate) fn working_tree_is_clean(repo_root: &Path) -> eyre::Result<bool> {
+    let exit_code = Cmd::git()
+        .arg("-C")
+        .arg(repo_root)
+        .args(["--git-dir", ".git"])
+        .args(["diff", "--quiet", "HEAD"])
+        .run_for_exit_code(0..=1)?;
+    Ok(exit_code == 0)
+}
+
 pub(crate) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
+        .arg("-C")
+        .arg(repo_root)
+        .args(["--git-dir", ".git"])
         .args(["rev-parse", "--verify", "--end-of-options", commit])
-        .current_dir(repo_root)
         .output()?;
     strip_trailing_newline(&mut output)?;
     let output =
@@ -57,6 +69,9 @@ pub(crate) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<Str
 
 pub(crate) fn show_commit(commit_id: &str, repo_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
+        .arg("-C")
+        .arg(repo_root)
+        .args(["--git-dir", ".git"])
         .args([
             "show",
             "--color=always",
@@ -67,7 +82,6 @@ pub(crate) fn show_commit(commit_id: &str, repo_root: &Path) -> eyre::Result<Str
             "--end-of-options",
             commit_id,
         ])
-        .current_dir(repo_root)
         .output()?;
     strip_trailing_newline(&mut output)?;
 

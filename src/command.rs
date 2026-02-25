@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     ffi::OsStr,
-    path::Path,
+    ops::RangeBounds,
     process::{Command, Stdio},
 };
 
@@ -48,7 +48,6 @@ macro_rules! cmd_wrapper {
 impl Cmd {
     cmd_wrapper!(arg, arg: impl AsRef<OsStr>);
     cmd_wrapper!(args, args: impl IntoIterator<Item = impl AsRef<OsStr>>);
-    cmd_wrapper!(current_dir, dir: impl AsRef<Path>);
     cmd_wrapper!(stdin, cfg: impl Into<Stdio>);
     cmd_wrapper!(stdout, cfg: impl Into<Stdio>);
     cmd_wrapper!(stderr, cfg: impl Into<Stdio>);
@@ -66,19 +65,33 @@ impl Cmd {
         Ok(())
     }
 
+    pub(crate) fn run_for_exit_code(
+        &mut self,
+        allowed_exit_codes: impl RangeBounds<i32>,
+    ) -> eyre::Result<i32> {
+        let output = self.get_output(allowed_exit_codes)?;
+        Ok(output
+            .status
+            .code()
+            .expect("exit code is in allowed range, so it's not None"))
+    }
+
     pub(crate) fn output(&mut self) -> eyre::Result<Vec<u8>> {
-        Ok(self.get_output()?.stdout)
+        Ok(self.get_output(0..=0)?.stdout)
     }
 
     pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
-        let output = self.get_output()?;
+        let output = self.get_output(0..=0)?;
         serde_json::from_slice(&output.stdout)
             .wrap_err("failed to decode output of external command")
             .with_context_from_cmd(self)
             .with_context_from_output(&output)
     }
 
-    fn get_output(&mut self) -> eyre::Result<std::process::Output> {
+    fn get_output(
+        &mut self,
+        allowed_exit_codes: impl RangeBounds<i32>,
+    ) -> eyre::Result<std::process::Output> {
         log::debug!("executing command: {}", show_cmd(&self.inner));
         let output = self
             .inner
@@ -86,7 +99,11 @@ impl Cmd {
             .wrap_err("failed to run external command")
             .with_context_from_cmd(self)?;
 
-        if !output.status.success() {
+        let success = output
+            .status
+            .code()
+            .is_some_and(|code| allowed_exit_codes.contains(&code));
+        if !success {
             return Err(eyre!(
                 "external command did not finish successfully ({})",
                 output.status,
