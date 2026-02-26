@@ -2,6 +2,14 @@
 name = "ndf"
 version = "0.1.0"
 edition = "2024"
+description = "Tool for comparing multiple Nix derivations between commits"
+readme = "README.md"
+repository = "https://github.com/bartoszwjn/ndf"
+license = "MIT OR Apache-2.0"
+keywords = ["nix"]
+categories = ["command-line-utilities"]
+publish = false
+default-run = "ndf"
 
 [dependencies]
 anstream = "1.0.0"

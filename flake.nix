@@ -1,5 +1,5 @@
 {
-  description = "A tool for comparing Nix derivations between commits";
+  description = "Tool for comparing multiple Nix derivations between commits";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

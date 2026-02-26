@@ -1,6 +1,7 @@
 { lib, craneLib }:
 let
   src = craneLib.cleanCargoSource ./.;
+  cargoToml = lib.importTOML ./Cargo.toml;
 
   commonArgs = {
     inherit src;
@@ -22,6 +23,18 @@ let
           fmt
           test
           ;
+      };
+
+      meta = {
+        description = cargoToml.package.description;
+        homepage = cargoToml.package.homepage or cargoToml.package.repository;
+        license =
+          assert cargoToml.package.license == "MIT OR Apache-2.0";
+          [
+            lib.licenses.mit
+            lib.licenses.asl20
+          ];
+        mainProgram = cargoToml.package.default-run;
       };
     }
   );
