@@ -20,7 +20,9 @@ fn main() -> ExitCode {
 }
 
 fn run() -> eyre::Result<ExitCode> {
-    color_eyre::install()?;
+    color_eyre::config::HookBuilder::default()
+        .display_env_section(false)
+        .install()?;
     env_logger::init();
 
     let args = Cli::parse(); // on error returns with exit code 2
