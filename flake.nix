@@ -16,17 +16,18 @@
     let
       inherit (inputs.nixpkgs) lib;
 
+      inherit (builtins) head mapAttrs zipAttrsWith;
       eachSystem =
-        f:
-        lib.pipe (import inputs.systems) [
-          (map (system: lib.mapAttrs (k: v: { ${system} = v; }) (f system)))
-          (lib.zipAttrsWith (k: lib.foldl' (acc: attrs: acc // attrs) { }))
-        ];
+        systems: f:
+        zipAttrsWith (k: zipAttrsWith (k: head)) (
+          map (system: mapAttrs (k: v: { ${system} = v; }) (f system)) systems
+        );
     in
-    eachSystem (
+    eachSystem (import inputs.systems) (
       system:
       let
         pkgs = inputs.nixpkgs.legacyPackages.${system};
+
         craneLib = import inputs.crane { inherit pkgs; };
 
         treefmtEval = (import inputs.treefmt-nix).evalModule pkgs {
@@ -37,16 +38,17 @@
           programs.rustfmt.enable = true;
         };
 
-        ndf = import ./package.nix { inherit lib craneLib; };
+        packageName = "ndf";
+        package = pkgs.callPackage ./package.nix { inherit craneLib; };
       in
       {
         packages = {
-          inherit ndf;
-          default = ndf;
+          default = package;
+          ${packageName} = package;
         };
 
         checks = {
-          inherit ndf;
+          ${packageName} = package;
           treefmt-check = treefmtEval.config.build.check (
             lib.fileset.toSource {
               root = ./.;
@@ -54,10 +56,13 @@
             }
           );
         }
-        // lib.mapAttrs' (testName: lib.nameValuePair "ndf-test-${testName}") ndf.tests;
+        // lib.mapAttrs' (testName: lib.nameValuePair "${packageName}-${testName}") package.tests;
 
         devShells.default = craneLib.devShell {
-          inputsFrom = [ treefmtEval.config.build.devShell ];
+          inputsFrom = [
+            package
+            treefmtEval.config.build.devShell
+          ];
         };
 
         formatter = treefmtEval.config.build.wrapper;
