@@ -1,7 +1,4 @@
-use std::{
-    os::unix::ffi::OsStrExt,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use eyre::bail;
 
@@ -33,7 +30,7 @@ pub(crate) enum Source {
 ///
 /// Guaranteed to contain only characters that can be used in path-like flake references.
 #[derive(Clone, Debug)]
-pub(crate) struct FlakePath(PathBuf);
+pub(crate) struct FlakePath(String);
 
 #[derive(Clone, Debug)]
 pub(crate) enum Revision {
@@ -47,22 +44,34 @@ pub(crate) struct AttrPath(pub(crate) String);
 impl FlakePath {
     pub(crate) fn new(path: PathBuf) -> eyre::Result<Self> {
         assert!(path.is_absolute());
-        let bytes = path.as_os_str().as_bytes();
-        if let Some(invalid_byte) = bytes.iter().copied().find(|b| !Self::is_valid_byte(b)) {
+        let string = match path.into_os_string().into_string() {
+            Ok(string) => string,
+            Err(os_string) => bail!("flake path contains invalid Unicode: {os_string:?}"),
+        };
+        if let Some(invalid) = string.chars().find(|&c| !Self::is_valid_char(c)) {
             bail!(
                 "flake path contains an invalid character: {}",
-                std::ascii::escape_default(invalid_byte)
+                invalid.escape_default(),
             )
         }
-        Ok(Self(path))
+        Ok(Self(string))
     }
 
-    fn is_valid_byte(byte: &u8) -> bool {
+    fn is_valid_char(c: char) -> bool {
+        // Nix allows all unicode characters except `#` and `?`, but Lix is more restrictive:
+        // https://nix.dev/manual/nix/2.33/command-ref/new-cli/nix3-flake.html#path-like-syntax
         // https://git.lix.systems/lix-project/lix/src/commit/2.94.0/lix/libexpr/flake/flakeref.cc#L86
-        byte.is_ascii_alphanumeric() || b"-._~!$&'\"()*+,;=/".contains(byte)
+        //
+        // TODO: it should be possible to express any path using URL-like syntax
+        // with percent encoding.
+        c.is_ascii_alphanumeric() || "-._~!$&'\"()*+,;=/".contains(c)
     }
 
-    pub(crate) fn path(&self) -> &Path {
+    pub(crate) fn as_path(&self) -> &Path {
+        self.0.as_ref()
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
         self.0.as_ref()
     }
 }
@@ -85,7 +94,7 @@ impl std::fmt::Display for DiffSpec {
         }
 
         let (source_header, source_path) = match &self.source {
-            Source::Flake(flake_path) => ("Flake", flake_path.path()),
+            Source::Flake(flake_path) => ("Flake", flake_path.as_path()),
             Source::File(path) => ("File", path.as_path()),
         };
         writeln!(

@@ -21,8 +21,7 @@ pub(crate) fn get_flake_packages(flake_path: &FlakePath) -> eyre::Result<Vec<Str
     let current_system = get_current_system()?;
     let package_names_fn =
         format!("flake: builtins.attrNames (flake.packages.{current_system} or {{}})");
-    let mut flake_ref = flake_path.path().as_os_str().to_os_string();
-    flake_ref.push("#.");
+    let flake_ref = format!("{}#.", flake_path.as_str());
     Cmd::nix()
         .args(["eval", "--json", "--apply", &package_names_fn, "--"])
         .arg(flake_ref)
@@ -31,8 +30,7 @@ pub(crate) fn get_flake_packages(flake_path: &FlakePath) -> eyre::Result<Vec<Str
 
 pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Result<Vec<String>> {
     let nixos_names_fn = "flake: builtins.attrNames (flake.nixosConfigurations or {})";
-    let mut flake_ref = flake_path.path().as_os_str().to_os_string();
-    flake_ref.push("#.");
+    let flake_ref = format!("{}#.", flake_path.as_str());
     Cmd::nix()
         .args(["eval", "--json", "--apply", nixos_names_fn, "--"])
         .arg(flake_ref)
@@ -40,13 +38,10 @@ pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Re
 }
 
 pub(crate) fn get_file_output_attributes(file: &Path) -> eyre::Result<Vec<String>> {
+    let attr_names_fn = "x: builtins.attrNames (if builtins.isFunction x then x {} else x)";
     Cmd::nix()
-        .args(["eval", "--json", "--file"])
+        .args(["eval", "--json", "--apply", attr_names_fn, "--file"])
         .arg(file)
-        .args([
-            "--apply",
-            "x: let r = if builtins.isFunction x then x {} else x; in builtins.attrNames r",
-        ])
         .output_json()
 }
 
@@ -70,15 +65,13 @@ pub(crate) fn get_drv_path(
 
     match source {
         Source::Flake(flake_path) => {
-            let mut flake_ref = flake_path.path().as_os_str().to_os_string();
-            if let Some(rev) = commit_id {
-                flake_ref.push("?rev=");
-                flake_ref.push(rev);
-            }
-            flake_ref.push("#");
-            flake_ref.push(&attr_path.0);
+            let flake_ref = if let Some(rev) = commit_id {
+                format!("{}?rev={}#{}", flake_path.as_str(), rev, attr_path.0)
+            } else {
+                format!("{}#{}", flake_path.as_str(), attr_path.0)
+            };
 
-            cmd.arg("--").arg(&flake_ref).output_json()
+            cmd.args(["--", &flake_ref]).output_json()
         }
         Source::File(path) => match commit_id {
             None => cmd

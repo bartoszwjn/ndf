@@ -62,7 +62,7 @@ pub struct Cli {
     /// Only local filesystem paths are supported,
     /// other flake reference types (e.g. 'github') are not.
     #[arg(long, default_value = ".")]
-    flake: OsString,
+    flake: String,
 
     /// Interpret paths as attribute paths relative to the Nix expression in the given file.
     #[arg(long, conflicts_with("flake"))]
@@ -130,7 +130,7 @@ impl Cli {
             })?),
         };
         let repo = git::get_repo_root(match &source {
-            Source::Flake(flake_path) => flake_path.path(),
+            Source::Flake(flake_path) => flake_path.as_path(),
             Source::File(file_path) => file_path,
         })?;
 
@@ -206,7 +206,7 @@ impl Cli {
     }
 }
 
-fn validate_flake_argument(flake: &OsStr) -> eyre::Result<FlakePath> {
+fn validate_flake_argument(flake: &str) -> eyre::Result<FlakePath> {
     let path = Path::new(flake);
     // Based on the path-like syntax described in `nix flake --help`,
     // but we allow relative paths to start with `../` as well for convenience.
@@ -218,6 +218,9 @@ fn validate_flake_argument(flake: &OsStr) -> eyre::Result<FlakePath> {
     // so in practice Nix allows this as well.
     if !(path.is_absolute() || path.starts_with(".") || path.starts_with("..")) {
         bail!("flake paths must be absolute paths, or start with './' or '../'");
+    }
+    if flake.contains(['#', '?']) {
+        bail!("flake paths must not contain '#' or '?' characters");
     }
 
     let path = path
