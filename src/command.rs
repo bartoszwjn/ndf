@@ -92,7 +92,7 @@ impl Cmd {
         &mut self,
         allowed_exit_codes: impl RangeBounds<i32>,
     ) -> eyre::Result<std::process::Output> {
-        log::debug!("executing command: {}", show_cmd(&self.inner));
+        trace_program(&self.inner);
         let output = self
             .inner
             .output()
@@ -114,6 +114,13 @@ impl Cmd {
 
         Ok(output)
     }
+}
+
+fn trace_program(command: &Command) {
+    tracing::trace!(
+        command = %show_cmd(command),
+        "executing external program",
+    );
 }
 
 fn show_cmd(command: &Command) -> String {

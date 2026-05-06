@@ -1,7 +1,6 @@
 use std::{
     ffi::{OsStr, OsString},
     fs,
-    num::NonZero,
     path::{Path, PathBuf},
     process::ExitCode,
 };
@@ -96,7 +95,7 @@ pub(crate) enum DiffTool {
 }
 
 impl Cli {
-    pub fn run(self) -> eyre::Result<ExitCode> {
+    pub fn exec(self) -> eyre::Result<ExitCode> {
         let eval_jobs = self.eval_jobs;
         let spec = self.build_diff_spec()?;
 
@@ -306,33 +305,35 @@ fn attr_path_from_args(attr_path: String, nixos: bool, source: &Source) -> AttrP
 }
 
 fn build_thread_pool(eval_jobs: isize) -> eyre::Result<Option<ThreadPool>> {
-    let num_threads: NonZero<usize> = match eval_jobs {
-        1.. => {
-            NonZero::new(usize::try_from(eval_jobs).expect("positive isize must fit into usize"))
-                .expect("value is positive")
-        }
-        ..=0 => {
-            let available: usize = std::thread::available_parallelism()
-                .wrap_err("failed to query the number of available threads")?
-                .get();
-            log::debug!("Available parallelism: {available}");
-            let reduce_by: usize = eval_jobs.unsigned_abs();
-            NonZero::new(available.saturating_sub(reduce_by)).unwrap_or(NonZero::<usize>::MIN)
+    let num_threads: usize = match eval_jobs {
+        positive @ 1_isize.. => positive as usize,
+        below_zero @ ..=0 => {
+            let available = match std::thread::available_parallelism() {
+                Ok(non_zero) => non_zero.get(),
+                Err(error) => {
+                    tracing::warn!(
+                        error = &error as &(dyn std::error::Error + Send + Sync),
+                        "failed to query the number of available CPUs, using 1 thread",
+                    );
+                    1
+                }
+            };
+            available.saturating_add_signed(below_zero).max(1)
         }
     };
 
-    match num_threads.get() {
+    match num_threads {
         0 => unreachable!(),
         1 => {
-            log::debug!("Requested parallelism of 1, using only the current thread");
+            tracing::debug!("requested parallelism of 1, using only the current thread");
             Ok(None)
         }
         num_threads @ 2.. => {
-            log::debug!("Starting a thread pool with {num_threads} threads");
+            tracing::debug!(num_threads, "starting thread pool");
             ThreadPoolBuilder::new()
                 .num_threads(num_threads)
                 .build()
-                .wrap_err("failed to initialize a thread pool")
+                .wrap_err("thread pool creation failed")
                 .map(Some)
         }
     }
