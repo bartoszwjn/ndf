@@ -1,6 +1,5 @@
 use crate::{
     cli::DiffTool,
-    color::{GREEN_BOLD, RED_BOLD},
     command::Cmd,
     diff_spec::{AttrPath, DiffSpec},
     eval::EvalSpec,
@@ -43,8 +42,10 @@ fn print_pair_cmp(lhs: &AttrPath, rhs: &AttrPath, spec: &DiffSpec) {
     let lhs_pad = width - width_l;
     let rhs_pad = width - width_r;
     let DiffSpec { from, to, .. } = spec;
-    anstream::println!("{RED_BOLD}-{RED_BOLD:#} {lhs}{:lhs_pad$} {from}", "");
-    anstream::println!("{GREEN_BOLD}+{GREEN_BOLD:#} {rhs}{:rhs_pad$} {to}", "");
+
+    use crate::styles::{FROM, TO};
+    anstream::println!("{FROM}-{FROM:#} {lhs}{:lhs_pad$} {from}", "");
+    anstream::println!("{TO}+{TO:#} {rhs}{:rhs_pad$} {to}", "");
 }
 
 fn run_nix_diff(old_drv_path: &str, new_drv_path: &str) -> eyre::Result<()> {

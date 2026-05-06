@@ -2,10 +2,7 @@ use std::path::{Path, PathBuf};
 
 use eyre::bail;
 
-use crate::{
-    cli::DiffTool,
-    color::{BLUE, BOLD, CYAN, MAGENTA},
-};
+use crate::cli::DiffTool;
 
 #[derive(Clone, Debug)]
 pub(crate) struct DiffSpec {
@@ -87,9 +84,11 @@ impl Revision {
 
 impl std::fmt::Display for DiffSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::styles::{HEADER, SOURCE};
+
         macro_rules! header {
             ($name:expr) => {
-                format_args!("{BOLD}{: <6}{BOLD:#}", format!("{}:", $name))
+                format_args!("{HEADER}{: <6}{HEADER:#}", format!("{}:", $name))
             };
         }
 
@@ -99,7 +98,7 @@ impl std::fmt::Display for DiffSpec {
         };
         writeln!(
             f,
-            "{} {BLUE}{}{BLUE:#}",
+            "{} {SOURCE}{}{SOURCE:#}",
             header!(source_header),
             source_path.display()
         )?;
@@ -132,7 +131,8 @@ impl std::fmt::Display for Revision {
             Self::GitRevision { display, .. } => f.write_str(display),
             // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
             Self::GitWorktree => {
-                write!(f, "{MAGENTA}[worktree]{MAGENTA:#}")
+                use crate::styles::WORKTREE;
+                write!(f, "{WORKTREE}[worktree]{WORKTREE:#}")
             }
         }
     }
@@ -140,6 +140,7 @@ impl std::fmt::Display for Revision {
 
 impl std::fmt::Display for AttrPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{CYAN}{}{CYAN:#}", self.0)
+        use crate::styles::ATTR_PATH;
+        write!(f, "{ATTR_PATH}{}{ATTR_PATH:#}", self.0)
     }
 }

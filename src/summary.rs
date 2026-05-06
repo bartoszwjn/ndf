@@ -1,9 +1,6 @@
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    color::{BOLD, GREEN, RED},
-    diff_spec::AttrPath,
-};
+use crate::diff_spec::AttrPath;
 
 pub(crate) struct Summary {
     pub(crate) items: Vec<SummaryItem>,
@@ -18,7 +15,9 @@ pub(crate) struct SummaryItem {
 
 impl std::fmt::Display for Summary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{BOLD}Summary:{BOLD:#}")?;
+        use crate::styles::HEADER;
+
+        writeln!(f, "{HEADER}Summary:{HEADER:#}")?;
         for item in &self.items {
             writeln!(f, "{item}")?;
         }
@@ -28,11 +27,13 @@ impl std::fmt::Display for Summary {
 
 impl std::fmt::Display for SummaryItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::styles::{EQUAL, NOT_EQUAL};
+
         let status_width = 2_usize;
         let status = if self.old_drv_path == self.new_drv_path {
-            format!("{GREEN}=={GREEN:#}")
+            format!("{EQUAL}=={EQUAL:#}")
         } else {
-            format!("{RED}!={RED:#}")
+            format!("{NOT_EQUAL}!={NOT_EQUAL:#}")
         };
 
         match &self.base {
