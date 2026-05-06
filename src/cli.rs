@@ -77,9 +77,10 @@ pub struct NdfApp {
 
     /// Maximum number of Nix evaluations to perform in parallel.
     ///
-    /// Zero (the default) means "as many as there are available threads",
-    /// a negative number `-N` means "`N` fewer than the number of available threads".
-    #[arg(long, default_value_t = 0)]
+    /// When set to zero (the default), the number of CPUs in the system will be used.
+    ///
+    /// When set to a negative number `-N`, the number of CPUs minus `N` will be used.
+    #[arg(long, short = 'j', default_value_t = 0)]
     eval_jobs: isize,
 
     #[command(flatten)]
