@@ -82,57 +82,86 @@ impl Cmd {
             Err(error) => {
                 let utf8_error = error.utf8_error();
                 output.stdout = error.into_bytes();
-                Err(eyre!(utf8_error).wrap_err(format!(
-                    "output of external program {} is not valid utf-8",
-                    display_program(&self.inner),
-                )))
-                .with_context_from_cmd(self)
-                .with_context_from_output(&output)
+                self.add_error_context(
+                    Some(&output),
+                    Err(eyre!(utf8_error).wrap_err(format!(
+                        "output of external program {} is not valid utf-8",
+                        display_program(&self.inner),
+                    ))),
+                )
             }
         }
     }
 
     pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
         let output = self.get_output(0..=0)?;
-        serde_json::from_slice(&output.stdout)
-            .wrap_err_with(|| {
+        self.add_error_context(
+            Some(&output),
+            serde_json::from_slice(&output.stdout).wrap_err_with(|| {
                 format!(
                     "failed to decode output of external program {}",
                     display_program(&self.inner),
                 )
-            })
-            .with_context_from_cmd(self)
-            .with_context_from_output(&output)
+            }),
+        )
     }
 
     fn get_output(&mut self, allowed_exit_codes: impl RangeBounds<i32>) -> eyre::Result<Output> {
         trace_program(&self.inner);
-        let output = self
-            .inner
-            .output()
-            .wrap_err_with(|| {
+        let result = self.inner.output();
+        let output = self.add_error_context(
+            None,
+            result.wrap_err_with(|| {
                 format!(
                     "failed to execute external program {}",
                     display_program(&self.inner),
                 )
-            })
-            .with_context_from_cmd(self)?;
+            }),
+        )?;
 
         let success = output
             .status
             .code()
             .is_some_and(|code| allowed_exit_codes.contains(&code));
         if !success {
-            return Err(eyre!(
-                "external program {} did not finish successfully ({})",
-                display_program(&self.inner),
-                output.status,
-            )
-            .with_context_from_cmd(self)
-            .with_context_from_output(&output));
+            return self.add_error_context(
+                Some(&output),
+                Err(eyre!(
+                    "external program {} did not finish successfully ({})",
+                    display_program(&self.inner),
+                    output.status,
+                )),
+            );
         }
 
         Ok(output)
+    }
+
+    fn add_error_context<T>(
+        &self,
+        output: Option<&Output>,
+        result: eyre::Result<T>,
+    ) -> eyre::Result<T> {
+        let command_section = || display_command(&self.inner).to_string().header("Command:");
+
+        let stdout_section = || {
+            let stdout = output.map(|output| &output.stdout[..]).unwrap_or(&[]);
+            String::from_utf8_lossy(stdout)
+                .into_owned()
+                .header("Captured stdout:")
+        };
+
+        let stderr_section = || {
+            let stderr = output.map(|output| &output.stderr[..]).unwrap_or(&[]);
+            String::from_utf8_lossy(stderr)
+                .into_owned()
+                .header("Captured stderr:")
+        };
+
+        result
+            .with_section(command_section)
+            .with_section(stdout_section)
+            .with_section(stderr_section)
     }
 }
 
@@ -200,32 +229,4 @@ fn display_arg(arg: &OsStr) -> impl fmt::Display {
             write!(f, "{arg}")
         }
     })
-}
-
-trait ContextExt {
-    type Return;
-
-    fn with_context_from_cmd(self, cmd: &Cmd) -> Self::Return;
-    fn with_context_from_output(self, output: &Output) -> Self::Return;
-}
-
-impl<T: Section<Return = T>> ContextExt for T {
-    type Return = T::Return;
-
-    fn with_context_from_cmd(self, cmd: &Cmd) -> Self::Return {
-        self.with_section(|| display_command(&cmd.inner).to_string().header("Command:"))
-    }
-
-    fn with_context_from_output(self, output: &Output) -> Self::Return {
-        self.with_section(|| {
-            String::from_utf8_lossy(&output.stdout)
-                .into_owned()
-                .header("Captured stdout:")
-        })
-        .with_section(|| {
-            String::from_utf8_lossy(&output.stderr)
-                .into_owned()
-                .header("Captured stderr:")
-        })
-    }
 }
