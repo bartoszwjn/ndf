@@ -9,4 +9,4 @@ mod nix;
 mod summary;
 
 #[doc(hidden)]
-pub use cli::Cli;
+pub use cli::NdfApp;

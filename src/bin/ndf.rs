@@ -5,7 +5,7 @@ use anstyle::{AnsiColor, Style};
 use clap::Parser;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-use ndf::Cli;
+use ndf::NdfApp;
 
 fn main() -> ExitCode {
     match exec() {
@@ -21,7 +21,7 @@ fn main() -> ExitCode {
 }
 
 fn exec() -> eyre::Result<ExitCode> {
-    let app = Cli::parse(); // on error returns with exit code 2
+    let app = NdfApp::parse(); // on error returns with exit code 2
 
     init_eyre()?;
     init_tracing();

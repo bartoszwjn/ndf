@@ -22,7 +22,7 @@ const AFTER_HELP: &str = "\
 /// Compare Nix derivations between two revisions.
 #[derive(Clone, Debug, Parser)]
 #[command(version, after_help(AFTER_HELP))]
-pub struct Cli {
+pub struct NdfApp {
     /// Attribute paths to compare.
     ///
     /// Each path is compared between the revisions specified with `--from` and `--to`.
@@ -93,7 +93,7 @@ pub(crate) enum DiffTool {
     NixDiff,
 }
 
-impl Cli {
+impl NdfApp {
     pub fn exec(self) -> eyre::Result<ExitCode> {
         let eval_jobs = self.eval_jobs;
         let spec = self.build_diff_spec()?;
