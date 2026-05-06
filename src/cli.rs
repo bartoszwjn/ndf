@@ -5,7 +5,6 @@ use std::{
     process::ExitCode,
 };
 
-use anstream::{print, println};
 use clap::{Parser, ValueEnum};
 use eyre::{WrapErr, bail, eyre};
 use rayon::{ThreadPool, ThreadPoolBuilder};
@@ -99,12 +98,12 @@ impl Cli {
         let eval_jobs = self.eval_jobs;
         let spec = self.build_diff_spec()?;
 
-        println!("{spec}");
+        anstream::println!("{spec}");
 
         let thread_pool = build_thread_pool(eval_jobs)?;
         let summary = eval::eval_and_compare_paths(&spec, thread_pool)?;
 
-        print!("{summary}");
+        anstream::print!("{summary}");
 
         let all_equal = summary
             .items

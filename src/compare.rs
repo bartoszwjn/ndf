@@ -1,5 +1,3 @@
-use anstream::println;
-
 use crate::{
     cli::DiffTool,
     color::{GREEN_BOLD, RED_BOLD},
@@ -25,7 +23,7 @@ pub(crate) fn compare_paths<'spec>(
             if old_drv_path != new_drv_path {
                 print_pair_cmp(lhs_spec.attr_path, rhs_spec.attr_path, spec);
                 run_nix_diff(&old_drv_path, &new_drv_path)?;
-                println!();
+                anstream::println!();
             }
         }
     }
@@ -44,14 +42,9 @@ fn print_pair_cmp(lhs: &AttrPath, rhs: &AttrPath, spec: &DiffSpec) {
     let width = width_l.max(width_r);
     let lhs_pad = width - width_l;
     let rhs_pad = width - width_r;
-    println!(
-        "{RED_BOLD}-{RED_BOLD:#} {}{:lhs_pad$} {}",
-        lhs, "", spec.from
-    );
-    println!(
-        "{GREEN_BOLD}+{GREEN_BOLD:#} {}{:rhs_pad$} {}",
-        rhs, "", spec.to
-    );
+    let DiffSpec { from, to, .. } = spec;
+    anstream::println!("{RED_BOLD}-{RED_BOLD:#} {lhs}{:lhs_pad$} {from}", "");
+    anstream::println!("{GREEN_BOLD}+{GREEN_BOLD:#} {rhs}{:rhs_pad$} {to}", "");
 }
 
 fn run_nix_diff(old_drv_path: &str, new_drv_path: &str) -> eyre::Result<()> {
