@@ -5,7 +5,6 @@ use std::{
     process::ExitCode,
 };
 
-use clap::{Parser, ValueEnum};
 use eyre::{WrapErr, bail, eyre};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
@@ -20,7 +19,7 @@ const AFTER_HELP: &str = "\
 ";
 
 /// Compare Nix derivations between two revisions.
-#[derive(Clone, Debug, Parser)]
+#[derive(clap::Parser, Debug)]
 #[command(version, after_help(AFTER_HELP))]
 pub struct NdfApp {
     /// Attribute paths to compare.
@@ -82,15 +81,38 @@ pub struct NdfApp {
     /// a negative number `-N` means "`N` fewer than the number of available threads".
     #[arg(long, default_value_t = 0)]
     eval_jobs: isize,
+
+    #[command(flatten)]
+    logging: LoggingOptions,
 }
 
 /// Program used to compare derivations.
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(clap::ValueEnum, Clone, Copy, Debug)]
 pub(crate) enum DiffTool {
     /// Do not diff the derivations, only check if they are identical.
     None,
     /// Use nix-diff to compare derivations.
     NixDiff,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Logging options")]
+struct LoggingOptions {
+    /// Be less verbose.
+    ///
+    /// Can be specified multiple times, with each instance further reducing log verbosity.
+    ///
+    /// Each instance of `--quiet` cancels out one instance of `--verbose` and vice versa.
+    #[arg(long, short = 'q', action = clap::ArgAction::Count)]
+    quiet: u8,
+
+    /// Be more verbose.
+    ///
+    /// Can be specified multiple times, with each instance further increasing log verbosity.
+    ///
+    /// Each instance of `--verbose` cancels out one instance of `--quiet` and vice versa.
+    #[arg(long, short = 'v', action = clap::ArgAction::Count)]
+    verbose: u8,
 }
 
 impl NdfApp {
@@ -114,6 +136,16 @@ impl NdfApp {
         } else {
             ExitCode::from(1)
         })
+    }
+
+    pub fn default_log_level(&self) -> tracing::Level {
+        match i16::from(self.logging.verbose) - i16::from(self.logging.quiet) {
+            ..=-2 => tracing::Level::ERROR,
+            -1 => tracing::Level::WARN,
+            0 => tracing::Level::INFO,
+            1 => tracing::Level::DEBUG,
+            2.. => tracing::Level::TRACE,
+        }
     }
 
     fn build_diff_spec(self) -> eyre::Result<DiffSpec> {
