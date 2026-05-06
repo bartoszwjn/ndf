@@ -36,8 +36,8 @@ pub(crate) fn compare_paths<'spec>(
 }
 
 fn print_pair_cmp(lhs: &AttrPath, rhs: &AttrPath, spec: &DiffSpec) {
-    let width_l = unicode_width::UnicodeWidthStr::width(lhs.0.as_str());
-    let width_r = unicode_width::UnicodeWidthStr::width(rhs.0.as_str());
+    let width_l = lhs.display_width();
+    let width_r = rhs.display_width();
     let width = width_l.max(width_r);
     let lhs_pad = width - width_l;
     let rhs_pad = width - width_r;

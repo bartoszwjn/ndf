@@ -1,5 +1,3 @@
-use unicode_width::UnicodeWidthStr;
-
 use crate::diff_spec::AttrPath;
 
 pub(crate) struct Summary {
@@ -38,7 +36,7 @@ impl std::fmt::Display for SummaryItem {
 
         match &self.base {
             None => {
-                let attr_path_width = UnicodeWidthStr::width(self.attr_path.0.as_str());
+                let attr_path_width = self.attr_path.display_width();
                 let max_width = attr_path_width.max(2);
                 let lhs_pad = max_width - attr_path_width;
                 let rhs_pad = max_width - status_width;
@@ -50,8 +48,8 @@ impl std::fmt::Display for SummaryItem {
                 writeln!(f, "  {}{:rhs_pad$} {}", status, "", self.new_drv_path)?;
             }
             Some(base) => {
-                let lhs_width = UnicodeWidthStr::width(base.0.as_str());
-                let rhs_width = UnicodeWidthStr::width(self.attr_path.0.as_str());
+                let lhs_width = base.display_width();
+                let rhs_width = self.attr_path.display_width();
                 let max_width = lhs_width.max(rhs_width);
                 let lhs_pad = max_width - lhs_width;
                 let rhs_pad = max_width - rhs_width;
