@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 use eyre::bail;
 
@@ -92,10 +95,10 @@ impl std::fmt::Display for DiffSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use crate::styles::{HEADER, SOURCE};
 
-        macro_rules! header {
-            ($name:expr) => {
-                format_args!("{HEADER}{: <6}{HEADER:#}", format!("{}:", $name))
-            };
+        fn header(name: &str) -> impl fmt::Display {
+            const MIN_WIDTH: usize = 5;
+            let pad_width = MIN_WIDTH.saturating_sub(name.len());
+            fmt::from_fn(move |f| write!(f, "{HEADER}{name}:{HEADER:#}{:pad_width$}", ""))
         }
 
         let (source_header, source_path) = match &self.source {
@@ -105,24 +108,24 @@ impl std::fmt::Display for DiffSpec {
         writeln!(
             f,
             "{} {SOURCE}{}{SOURCE:#}",
-            header!(source_header),
-            source_path.display()
+            header(source_header),
+            source_path.display(),
         )?;
 
-        writeln!(f, "{} {}", header!("Repo"), self.repo.display())?;
-        writeln!(f, "{} {}", header!("From"), self.from)?;
-        writeln!(f, "{} {}", header!("To"), self.to)?;
+        writeln!(f, "{} {}", header("Repo"), self.repo.display())?;
+        writeln!(f, "{} {}", header("From"), self.from)?;
+        writeln!(f, "{} {}", header("To"), self.to)?;
 
         let tool = match self.tool {
             DiffTool::None => "none",
             DiffTool::NixDiff => "nix-diff",
         };
-        writeln!(f, "{} {}", header!("Tool"), tool)?;
+        writeln!(f, "{} {}", header("Tool"), tool)?;
 
         if let Some(base) = &self.base {
-            writeln!(f, "{} {}", header!("Base"), base)?;
+            writeln!(f, "{} {}", header("Base"), base)?;
         }
-        writeln!(f, "{}", header!("Attribute paths"))?;
+        writeln!(f, "{}", header("Attribute paths"))?;
         for attr_path in &self.attr_paths {
             writeln!(f, "  {attr_path}")?;
         }
