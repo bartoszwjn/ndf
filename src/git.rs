@@ -48,21 +48,18 @@ pub(crate) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<Str
         .arg(repo_root)
         .args(["--git-dir", ".git"])
         .args(["rev-parse", "--verify", "--end-of-options", commit])
-        .output()?;
+        .output_string()?;
     strip_trailing_newline(&mut output)?;
-    let output =
-        String::from_utf8(output).wrap_err("output of 'git rev-parse' is not valid utf8")?;
 
-    assert_eq!(
-        output.len(),
-        40,
-        "'git rev-parse' output length is not 40: {}",
-        output.len()
-    );
-    assert!(
-        output.chars().all(|c| c.is_ascii_hexdigit()),
-        "'git rev-parse' output contains unexpected characters: {output:?}"
-    );
+    if output.len() != 40 {
+        bail!("expected 'git rev-parse' command output to be 40 characters long, got {output:?}");
+    }
+    if output.chars().any(|c| !c.is_ascii_hexdigit()) {
+        bail!(
+            "expected 'git rev-parse' command output to contain only hexadecimal digits, \
+            got {output:?}"
+        );
+    }
 
     Ok(output)
 }
@@ -82,22 +79,15 @@ pub(crate) fn show_commit(commit_id: &str, repo_root: &Path) -> eyre::Result<Str
             "--end-of-options",
             commit_id,
         ])
-        .output()?;
+        .output_string()?;
     strip_trailing_newline(&mut output)?;
 
-    Ok(String::from_utf8(output)
-        .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()))
+    Ok(output)
 }
 
-fn strip_trailing_newline(git_output: &mut Vec<u8>) -> eyre::Result<()> {
-    match git_output.last() {
-        Some(b'\n') => {
-            git_output.pop();
-            Ok(())
-        }
-        _ => bail!(
-            "expected a newline character at the end of 'git' command output, got {:?}",
-            String::from_utf8_lossy(git_output)
-        ),
+fn strip_trailing_newline(git_output: &mut String) -> eyre::Result<()> {
+    match git_output.pop() {
+        Some('\n') => Ok(()),
+        _ => bail!("expected 'git' command output to end with a newline, got {git_output:?}"),
     }
 }

@@ -56,12 +56,11 @@ impl Cmd {
 /// Running commands
 impl Cmd {
     pub(crate) fn run_inherit_stdio(&mut self) -> eyre::Result<()> {
-        let output = self
+        let _: Output = self
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
-            .output()?;
-        assert_eq!(output.len(), 0);
+            .get_output(0..=0)?;
         Ok(())
     }
 
@@ -76,8 +75,21 @@ impl Cmd {
             .expect("exit code is in allowed range, so it's not None"))
     }
 
-    pub(crate) fn output(&mut self) -> eyre::Result<Vec<u8>> {
-        Ok(self.get_output(0..=0)?.stdout)
+    pub(crate) fn output_string(&mut self) -> eyre::Result<String> {
+        let mut output = self.get_output(0..=0)?;
+        match String::from_utf8(output.stdout) {
+            Ok(string) => Ok(string),
+            Err(error) => {
+                let utf8_error = error.utf8_error();
+                output.stdout = error.into_bytes();
+                Err(eyre!(utf8_error).wrap_err(format!(
+                    "output of external program {} is not valid utf-8",
+                    display_program(&self.inner),
+                )))
+                .with_context_from_cmd(self)
+                .with_context_from_output(&output)
+            }
+        }
     }
 
     pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
