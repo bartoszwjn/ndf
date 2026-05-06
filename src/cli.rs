@@ -208,10 +208,16 @@ impl Cli {
 
 fn validate_flake_argument(flake: &OsStr) -> eyre::Result<FlakePath> {
     let path = Path::new(flake);
-    // Same as the path-like syntax described in `nix flake --help`.
+    // Based on the path-like syntax described in `nix flake --help`,
+    // but we allow relative paths to start with `../` as well for convenience.
+    //
     // https://nix.dev/manual/nix/2.33/command-ref/new-cli/nix3-flake.html#path-like-syntax
-    if path.is_relative() && !path.starts_with(Path::new(".")) {
-        bail!("flake paths must be absolute paths or start with './'");
+    //
+    // Nix doesn't actually require relative paths to start with `./`,
+    // a `.` anywhere inside the path is enough for it not to be treated as a `flake:` shorthand,
+    // so in practice Nix allows this as well.
+    if !(path.is_absolute() || path.starts_with(".") || path.starts_with("..")) {
+        bail!("flake paths must be absolute paths, or start with './' or '../'");
     }
 
     let path = path
