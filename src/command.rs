@@ -1,8 +1,8 @@
 use std::{
-    borrow::Cow,
     ffi::OsStr,
+    fmt,
     ops::RangeBounds,
-    process::{Command, Stdio},
+    process::{Command, Output, Stdio},
 };
 
 use color_eyre::{Section, SectionExt};
@@ -83,20 +83,27 @@ impl Cmd {
     pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
         let output = self.get_output(0..=0)?;
         serde_json::from_slice(&output.stdout)
-            .wrap_err("failed to decode output of external command")
+            .wrap_err_with(|| {
+                format!(
+                    "failed to decode output of external program {}",
+                    display_program(&self.inner),
+                )
+            })
             .with_context_from_cmd(self)
             .with_context_from_output(&output)
     }
 
-    fn get_output(
-        &mut self,
-        allowed_exit_codes: impl RangeBounds<i32>,
-    ) -> eyre::Result<std::process::Output> {
+    fn get_output(&mut self, allowed_exit_codes: impl RangeBounds<i32>) -> eyre::Result<Output> {
         trace_program(&self.inner);
         let output = self
             .inner
             .output()
-            .wrap_err("failed to run external command")
+            .wrap_err_with(|| {
+                format!(
+                    "failed to execute external program {}",
+                    display_program(&self.inner),
+                )
+            })
             .with_context_from_cmd(self)?;
 
         let success = output
@@ -105,7 +112,8 @@ impl Cmd {
             .is_some_and(|code| allowed_exit_codes.contains(&code));
         if !success {
             return Err(eyre!(
-                "external command did not finish successfully ({})",
+                "external program {} did not finish successfully ({})",
+                display_program(&self.inner),
                 output.status,
             )
             .with_context_from_cmd(self)
@@ -118,46 +126,85 @@ impl Cmd {
 
 fn trace_program(command: &Command) {
     tracing::trace!(
-        command = %show_cmd(command),
+        program = %command.get_program().display(),
+        args = %display_args(command),
         "executing external program",
     );
 }
 
-fn show_cmd(command: &Command) -> String {
-    let cmd = show_arg(command.get_program()).into_owned();
-    command
-        .get_args()
-        .map(show_arg)
-        .fold(cmd, |acc, arg| acc + " " + &arg)
+fn display_command(command: &Command) -> impl fmt::Display {
+    display_args_iter(|| {
+        [command.get_program()]
+            .into_iter()
+            .chain(command.get_args())
+    })
 }
 
-fn show_arg(arg: &OsStr) -> Cow<'_, str> {
-    let arg = arg.to_string_lossy();
-    if arg.is_empty() || arg.contains(['"', '\'']) || arg.contains(char::is_whitespace) {
-        let mut escaped = arg.replace('\'', "'\\''");
-        escaped.insert(0, '\'');
-        escaped.push('\'');
-        Cow::Owned(escaped)
-    } else {
-        arg
+fn display_program(command: &Command) -> impl fmt::Display {
+    display_arg(command.get_program())
+}
+
+fn display_args(command: &Command) -> impl fmt::Display {
+    display_args_iter(|| command.get_args())
+}
+
+fn display_args_iter<'a, Iter>(make_iter: impl Fn() -> Iter) -> impl fmt::Display
+where
+    Iter: Iterator<Item = &'a OsStr>,
+{
+    fmt::from_fn(move |f| {
+        let mut first = true;
+        for arg in make_iter() {
+            let arg = display_arg(arg);
+            if first {
+                write!(f, "{arg}")?;
+                first = false;
+            } else {
+                write!(f, " {arg}")?;
+            }
+        }
+        Ok(())
+    })
+}
+
+fn display_arg(arg: &OsStr) -> impl fmt::Display {
+    fn needs_quoting(c: char) -> bool {
+        match c {
+            '"' | '\'' | '\\' => true,
+            _ if c.is_whitespace() => true,
+
+            _ if c.is_alphanumeric() => false,
+            _ if c.is_ascii_punctuation() => false,
+
+            _ => true,
+        }
     }
+
+    let arg = arg.to_string_lossy();
+    fmt::from_fn(move |f| {
+        if arg.is_empty() || arg.chars().any(needs_quoting) {
+            write!(f, "{arg:?}")
+        } else {
+            write!(f, "{arg}")
+        }
+    })
 }
 
 trait ContextExt {
     type Return;
 
     fn with_context_from_cmd(self, cmd: &Cmd) -> Self::Return;
-    fn with_context_from_output(self, output: &std::process::Output) -> Self::Return;
+    fn with_context_from_output(self, output: &Output) -> Self::Return;
 }
 
 impl<T: Section<Return = T>> ContextExt for T {
     type Return = T::Return;
 
     fn with_context_from_cmd(self, cmd: &Cmd) -> Self::Return {
-        self.with_section(|| show_cmd(&cmd.inner).header("Command:"))
+        self.with_section(|| display_command(&cmd.inner).to_string().header("Command:"))
     }
 
-    fn with_context_from_output(self, output: &std::process::Output) -> Self::Return {
+    fn with_context_from_output(self, output: &Output) -> Self::Return {
         self.with_section(|| {
             String::from_utf8_lossy(&output.stdout)
                 .into_owned()
