@@ -17,12 +17,12 @@ resolver = "3"
 # Add triples corresponding to platforms commonly used by developers here.
 # https://doc.rust-lang.org/rustc/platform-support.html
 platforms = [
-    # keep-sorted start
-    "aarch64-apple-darwin",
-    "aarch64-unknown-linux-gnu",
-    "x86_64-apple-darwin",
-    "x86_64-unknown-linux-gnu",
-    # keep-sorted end
+  # keep-sorted start
+  "aarch64-apple-darwin",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+  # keep-sorted end
 ]
 
 # Write out exact versions rather than a semver range. (Defaults to false.)
