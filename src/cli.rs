@@ -168,13 +168,9 @@ impl NdfApp {
         })?;
 
         let mut worktree_status = None;
-        let mut worktree_is_clean = || match &worktree_status {
-            Some(cached) => Ok(*cached),
-            None => {
-                let is_clean = git::working_tree_is_clean(&repo)?;
-                worktree_status = Some(is_clean);
-                Ok(is_clean)
-            }
+        let mut worktree_is_clean = || match worktree_status {
+            Some(cached) => Ok(cached),
+            None => Ok(*worktree_status.insert(git::working_tree_is_clean(&repo)?)),
         };
 
         Ok(DiffSpec {
