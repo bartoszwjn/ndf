@@ -73,6 +73,9 @@
             package
             treefmtEval.config.build.devShell
           ];
+          packages = [
+            pkgs.cargo-hakari
+          ];
         };
 
         formatter = treefmtEval.config.build.wrapper;

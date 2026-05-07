@@ -27,3 +27,4 @@ tracing = "0.1.44"
 tracing-error = "0.2.1"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 unicode-width = { version = "0.2.2", default-features = false }
+workspace-hack = { version = "0.1", path = "crates/workspace-hack" }
