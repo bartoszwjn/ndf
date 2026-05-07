@@ -18,14 +18,23 @@ let
   cargoArtifacts = craneLib.buildDepsOnly baseArgs;
 
   clippy = craneLib.cargoClippy (
-    commonArgs // { cargoClippyExtraArgs = "--all-targets -- --deny warnings"; }
+    commonArgs // { cargoClippyExtraArgs = "--workspace --all-targets -- --deny warnings"; }
   );
 
-  doc = craneLib.cargoDoc (commonArgs // { env.RUSTDOCFLAGS = "--deny warnings"; });
+  doc = craneLib.cargoDoc (
+    commonArgs
+    // {
+      cargoDocExtraArgs = "--no-deps --workspace";
+      env.RUSTDOCFLAGS = "--deny warnings";
+    }
+  );
 
-  fmt = craneLib.cargoFmt { inherit (baseArgs) src strictDeps; };
+  fmt = craneLib.cargoFmt {
+    inherit (baseArgs) src strictDeps;
+    cargoExtraArgs = "--all"; # `--workspace` equivalent
+  };
 
-  test = craneLib.cargoTest commonArgs;
+  test = craneLib.cargoTest (commonArgs // { cargoTestExtraArgs = "--workspace"; });
 in
 
 craneLib.buildPackage (
