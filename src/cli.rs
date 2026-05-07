@@ -188,7 +188,7 @@ impl NdfApp {
             .wrap_err_with(|| format!("invalid value for option '--base': {:?}", self.base))?;
 
         let attr_paths = if self.attr_paths.is_empty() {
-            get_default_attr_names(&source, self.nixos)
+            get_default_attr_names(&repo, &source, &from, &to, self.nixos)
                 .wrap_err("failed to determine default attribute paths")?
                 .into_iter()
                 .map(|name| AttrPath::new(false, vec![name], self.nixos))
@@ -354,12 +354,33 @@ fn resolve_git_commit(commit: Option<&str>, repo_root: &Path) -> eyre::Result<Re
     Ok(Revision::GitRevision { commit_id, display })
 }
 
-fn get_default_attr_names(source: &Source, nixos: bool) -> eyre::Result<Vec<String>> {
-    Ok(match source {
-        Source::Flake(flake_path) if nixos => nix::get_flake_nixos_configurations(flake_path)?,
-        Source::Flake(flake_path) => nix::get_flake_packages(flake_path)?,
-        Source::File(file) => nix::get_file_output_attributes(file)?,
-    })
+fn get_default_attr_names(
+    repo_root: &Path,
+    source: &Source,
+    from: &Revision,
+    to: &Revision,
+    nixos: bool,
+) -> eyre::Result<Vec<String>> {
+    let from_commit = from.commit_id();
+    let to_commit = to.commit_id();
+
+    let get_for_commit = |commit_id| match source {
+        Source::Flake(flake_path) if nixos => {
+            nix::get_flake_nixos_configurations(flake_path, commit_id)
+        }
+        Source::Flake(flake_path) => nix::get_flake_packages(flake_path, commit_id),
+        Source::File(file_path) => nix::get_file_output_attributes(repo_root, file_path, commit_id),
+    };
+
+    if from_commit == to_commit {
+        get_for_commit(from_commit)
+    } else {
+        let mut names = get_for_commit(from_commit)?;
+        names.extend(get_for_commit(to_commit)?);
+        names.sort();
+        names.dedup();
+        Ok(names)
+    }
 }
 
 fn build_thread_pool(eval_jobs: isize) -> eyre::Result<Option<ThreadPool>> {

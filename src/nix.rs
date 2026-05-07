@@ -16,7 +16,10 @@ fn get_current_system() -> eyre::Result<String> {
         .output_json()
 }
 
-pub(crate) fn get_flake_packages(flake_path: &FlakePath) -> eyre::Result<Vec<String>> {
+pub(crate) fn get_flake_packages(
+    flake_path: &FlakePath,
+    commit_id: Option<&str>,
+) -> eyre::Result<Vec<String>> {
     let current_system = get_current_system()?;
     let system = to_string_literal(&current_system);
     Cmd::nix()
@@ -26,11 +29,14 @@ pub(crate) fn get_flake_packages(flake_path: &FlakePath) -> eyre::Result<Vec<Str
             "--apply",
             &format!("flake: builtins.attrNames (flake.packages.{system} or {{ }})"),
         ])
-        .args(["--", &format!("{}#.", flake_path.as_str())])
+        .args(["--", &make_flake_ref(flake_path, commit_id)])
         .output_json()
 }
 
-pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Result<Vec<String>> {
+pub(crate) fn get_flake_nixos_configurations(
+    flake_path: &FlakePath,
+    commit_id: Option<&str>,
+) -> eyre::Result<Vec<String>> {
     Cmd::nix()
         .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["eval", "--json"])
@@ -38,16 +44,27 @@ pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Re
             "--apply",
             "flake: builtins.attrNames (flake.nixosConfigurations or {})",
         ])
-        .args(["--", &format!("{}#.", flake_path.as_str())])
+        .args(["--", &make_flake_ref(flake_path, commit_id)])
         .output_json()
 }
 
-pub(crate) fn get_file_output_attributes(file: &Path) -> eyre::Result<Vec<String>> {
+pub(crate) fn get_file_output_attributes(
+    repo_root: &Path,
+    file_path: &Path,
+    commit_id: Option<&str>,
+) -> eyre::Result<Vec<String>> {
     Cmd::nix_instantiate()
         .args(["--eval", "--strict", "--json"])
         .args(["--expr", include_str!("nix/get-file-output-attributes.nix")])
-        .args(["--argstr", "path"])
-        .arg(file)
+        .args(["--argstr", "repoRoot"])
+        .arg(repo_root)
+        .args(["--argstr", "pathInRepo"])
+        .arg(make_path_in_repo(repo_root, file_path))
+        .args(if let Some(rev) = commit_id {
+            ["--argstr", "rev", rev]
+        } else {
+            ["--arg", "rev", "null"]
+        })
         .output_json()
 }
 
@@ -102,12 +119,7 @@ fn get_drv_path_flake(
         // when running multiple evaluations in parallel.
         .arg("--no-eval-cache")
         .args(["--apply", &apply_expr])
-        .arg("--")
-        .arg(&if let Some(rev) = commit_id {
-            format!("{}?rev={}#.", flake_path.as_str(), rev)
-        } else {
-            format!("{}#.", flake_path.as_str())
-        })
+        .args(["--", &make_flake_ref(flake_path, commit_id)])
         .output_json()
 }
 
@@ -117,9 +129,6 @@ fn get_drv_path_file(
     commit_id: Option<&str>,
     attr_path: &AttrPath,
 ) -> eyre::Result<GetDrvPathResult> {
-    let Ok(path_relative) = file_path.strip_prefix(repo_root) else {
-        unreachable!("repo_root must be a prefix of file_path")
-    };
     let attr_path_json = serde_json::to_string::<Vec<&str>>(&attr_path.file_query())
         .expect("serializing a list of strings into a String cannot fail");
 
@@ -129,7 +138,7 @@ fn get_drv_path_file(
         .args(["--argstr", "repoRoot"])
         .arg(repo_root)
         .args(["--argstr", "pathInRepo"])
-        .arg(path_relative)
+        .arg(make_path_in_repo(repo_root, file_path))
         .args(if let Some(rev) = commit_id {
             ["--argstr", "rev", rev]
         } else {
@@ -137,6 +146,20 @@ fn get_drv_path_file(
         })
         .args(["--argstr", "attrPathJson", &attr_path_json])
         .output_json()
+}
+
+fn make_flake_ref(flake_path: &FlakePath, commit_id: Option<&str>) -> String {
+    let path = flake_path.as_str();
+    match commit_id {
+        Some(rev) => format!("{path}?rev={rev}#."),
+        None => format!("{path}#."),
+    }
+}
+
+fn make_path_in_repo<'a>(repo_root: &Path, file_path: &'a Path) -> &'a Path {
+    file_path
+        .strip_prefix(repo_root)
+        .expect("repo_root must be a prefix of file_path")
 }
 
 /// Formats a given string as a string literal value in the Nix expression language.
