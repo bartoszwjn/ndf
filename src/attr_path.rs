@@ -1,5 +1,7 @@
 use std::fmt;
 
+use percent_encoding::{AsciiSet, CONTROLS};
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct AttrPath(String);
 
@@ -19,7 +21,11 @@ impl AttrPath {
 
     /// Display the attr path in a from suitable for using as part of a flake reference.
     pub(crate) fn to_flake_fragment(&self) -> impl fmt::Display {
-        self.to_cli_arg() // TODO: urlencode
+        // https://url.spec.whatwg.org/#fragment-percent-encode-set
+        const FRAGMENT_PERCENT_ENCODE_SET: AsciiSet =
+            CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+
+        percent_encoding::utf8_percent_encode(&self.0, &FRAGMENT_PERCENT_ENCODE_SET)
     }
 
     pub(crate) fn display_width(&self) -> usize {
