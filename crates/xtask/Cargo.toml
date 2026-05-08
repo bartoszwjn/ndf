@@ -2,7 +2,9 @@
 name = "xtask"
 version = "0.0.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 publish = false
+default-run = "xtask"
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }

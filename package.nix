@@ -22,6 +22,12 @@ let
     commonArgs // { cargoClippyExtraArgs = "--workspace --all-targets -- --deny warnings"; }
   );
 
+  deny = craneLib.cargoDeny {
+    inherit (baseArgs) src strictDeps;
+    cargoDenyChecks = "bans licenses sources";
+    cargoDenyExtraArgs = "--workspace";
+  };
+
   doc = craneLib.cargoDoc (
     commonArgs
     // {
@@ -75,6 +81,7 @@ craneLib.buildPackage (
       inherit
         # keep-sorted start
         clippy
+        deny
         doc
         fmt
         hakari

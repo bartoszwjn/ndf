@@ -75,6 +75,7 @@
             treefmtEval.config.build.devShell
           ];
           packages = [
+            pkgs.cargo-deny
             pkgs.cargo-hakari
           ];
         };
