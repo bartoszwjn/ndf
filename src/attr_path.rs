@@ -4,6 +4,9 @@ use percent_encoding::{AsciiSet, CONTROLS};
 
 use crate::diff_spec::Source;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub(crate) struct AttrPath {
     parts: Vec<String>,
@@ -230,7 +233,7 @@ impl fmt::Debug for AttrPath {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ParseError {
     ConsecutiveDots,
     TrailingDot,
