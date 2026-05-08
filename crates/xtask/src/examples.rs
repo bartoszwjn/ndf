@@ -227,6 +227,35 @@ fn examples(system: &str) -> BTreeMap<&'static str, Example<'_>> {
                 Ok(())
             }),
         },
+        Example {
+            name: "weird-names",
+            ops: Box::new(|dir| {
+                let packages1 = [
+                    r#"normal = drv "normal""#,
+                    r#""with whitespace" = drv "ws-1""#,
+                    r#""with.dots.tld" = drv "dots-1""#,
+                    r#""" = drv "empty""#,
+                    r#""with\"quotes\"" = drv "quotes-1""#,
+                ];
+                let packages2 = [
+                    r#"normal = drv "normal""#,
+                    r#""with whitespace" = drv "ws-2""#,
+                    r#""with.dots.tld" = drv "dots-2""#,
+                    r#""" = drv "empty""#,
+                    r#""with\"quotes\"" = drv "quotes-2""#,
+                ];
+
+                write_drv_nix(dir, system)?;
+                write_package_flake_nix(dir, system, packages1)?;
+                write_package_default_nix(dir, packages1)?;
+                commit(dir, "commit 1")?;
+                write_package_flake_nix(dir, system, packages2)?;
+                write_package_default_nix(dir, packages2)?;
+                commit(dir, "commit 2")?;
+
+                Ok(())
+            }),
+        },
     ]
     .into_iter()
     .map(|example| (example.name, example))
