@@ -1,8 +1,9 @@
 use std::path::Path;
 
 use crate::{
+    attr_path::AttrPath,
     command::Cmd,
-    diff_spec::{AttrPath, FlakePath, Source},
+    diff_spec::{FlakePath, Source},
 };
 
 fn get_current_system() -> eyre::Result<String> {
@@ -65,10 +66,11 @@ pub(crate) fn get_drv_path(
 
     match source {
         Source::Flake(flake_path) => {
+            let fragment = attr_path.to_flake_fragment();
             let flake_ref = if let Some(rev) = commit_id {
-                format!("{}?rev={}#{}", flake_path.as_str(), rev, attr_path.0)
+                format!("{}?rev={}#{}", flake_path.as_str(), rev, fragment)
             } else {
-                format!("{}#{}", flake_path.as_str(), attr_path.0)
+                format!("{}#{}", flake_path.as_str(), fragment)
             };
 
             cmd.args(["--", &flake_ref]).output_json()
@@ -77,7 +79,7 @@ pub(crate) fn get_drv_path(
             None => cmd
                 .arg("--file")
                 .arg(path)
-                .args(["--", &attr_path.0])
+                .args(["--", &attr_path.to_cli_arg().to_string()])
                 .output_json(),
             Some(rev) => {
                 let Ok(path_relative) = path.strip_prefix(repo_root) else {
@@ -98,7 +100,7 @@ pub(crate) fn get_drv_path(
                     .args(["--argstr", "pathInRepo"])
                     .arg(path_relative)
                     .args(["--argstr", "rev", rev])
-                    .args(["--", &attr_path.0])
+                    .args(["--", &attr_path.to_cli_arg().to_string()])
                     .output_json()
             }
         },

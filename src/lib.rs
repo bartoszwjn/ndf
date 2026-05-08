@@ -1,3 +1,4 @@
+mod attr_path;
 mod cli;
 mod command;
 mod compare;

@@ -5,7 +5,7 @@ use std::{
 
 use eyre::bail;
 
-use crate::cli::DiffTool;
+use crate::{attr_path::AttrPath, cli::DiffTool};
 
 #[derive(Clone, Debug)]
 pub(crate) struct DiffSpec {
@@ -37,9 +37,6 @@ pub(crate) enum Revision {
     GitRevision { commit_id: String, display: String },
     GitWorktree,
 }
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct AttrPath(pub(crate) String);
 
 impl FlakePath {
     pub(crate) fn new(path: PathBuf) -> eyre::Result<Self> {
@@ -85,12 +82,6 @@ impl Revision {
     }
 }
 
-impl AttrPath {
-    pub(crate) fn display_width(&self) -> usize {
-        unicode_width::UnicodeWidthStr::width(self.0.as_str())
-    }
-}
-
 impl std::fmt::Display for DiffSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use crate::styles::{HEADER, SOURCE};
@@ -123,11 +114,11 @@ impl std::fmt::Display for DiffSpec {
         writeln!(f, "{} {}", header("Tool"), tool)?;
 
         if let Some(base) = &self.base {
-            writeln!(f, "{} {}", header("Base"), base)?;
+            writeln!(f, "{} {}", header("Base"), base.display())?;
         }
         writeln!(f, "{}", header("Attribute paths"))?;
         for attr_path in &self.attr_paths {
-            writeln!(f, "  {attr_path}")?;
+            writeln!(f, "  {}", attr_path.display())?;
         }
 
         Ok(())
@@ -144,12 +135,5 @@ impl std::fmt::Display for Revision {
                 write!(f, "{WORKTREE}[worktree]{WORKTREE:#}")
             }
         }
-    }
-}
-
-impl std::fmt::Display for AttrPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::styles::ATTR_PATH;
-        write!(f, "{ATTR_PATH}{}{ATTR_PATH:#}", self.0)
     }
 }

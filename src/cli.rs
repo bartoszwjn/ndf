@@ -9,7 +9,8 @@ use eyre::{WrapErr, bail, eyre};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
-    diff_spec::{AttrPath, DiffSpec, FlakePath, Revision, Source},
+    attr_path::AttrPath,
+    diff_spec::{DiffSpec, FlakePath, Revision, Source},
     eval, git, nix,
 };
 
@@ -330,14 +331,15 @@ fn get_default_attr_paths(source: &Source, nixos: bool) -> eyre::Result<Vec<Stri
 }
 
 fn attr_path_from_args(attr_path: String, nixos: bool, source: &Source) -> AttrPath {
-    match (nixos, source) {
-        (false, _) => AttrPath(attr_path),
-        (true, Source::Flake(_)) => {
-            let mut attr_path = attr_path;
-            attr_path.insert_str(0, "nixosConfigurations.");
-            AttrPath(attr_path + ".config.system.build.toplevel")
+    if nixos {
+        let mut attr_path = attr_path;
+        match source {
+            Source::Flake(_) => attr_path.insert_str(0, "nixosConfigurations."),
+            Source::File(_) => {}
         }
-        (true, Source::File(_)) => AttrPath(attr_path + ".config.system.build.toplevel"),
+        AttrPath::new(attr_path + ".config.system.build.toplevel")
+    } else {
+        AttrPath::new(attr_path)
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::diff_spec::AttrPath;
+use crate::attr_path::AttrPath;
 
 pub(crate) struct Summary {
     pub(crate) items: Vec<SummaryItem>,
@@ -43,7 +43,9 @@ impl std::fmt::Display for SummaryItem {
                 writeln!(
                     f,
                     "  {}{:lhs_pad$} {}",
-                    self.attr_path, "", self.old_drv_path
+                    self.attr_path.display(),
+                    "",
+                    self.old_drv_path
                 )?;
                 writeln!(f, "  {}{:rhs_pad$} {}", status, "", self.new_drv_path)?;
             }
@@ -56,12 +58,18 @@ impl std::fmt::Display for SummaryItem {
                 writeln!(
                     f,
                     "  {:status_width$} {}{:lhs_pad$} {}",
-                    "", base, "", self.old_drv_path
+                    "",
+                    base.display(),
+                    "",
+                    self.old_drv_path
                 )?;
                 writeln!(
                     f,
                     "  {} {}{:rhs_pad$} {}",
-                    status, self.attr_path, "", self.new_drv_path
+                    status,
+                    self.attr_path.display(),
+                    "",
+                    self.new_drv_path
                 )?;
             }
         }

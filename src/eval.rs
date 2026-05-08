@@ -6,8 +6,9 @@ use rayon::{
 };
 
 use crate::{
+    attr_path::AttrPath,
     compare,
-    diff_spec::{AttrPath, DiffSpec},
+    diff_spec::DiffSpec,
     nix,
     summary::{Summary, SummaryItem},
 };
