@@ -6,6 +6,7 @@ pub(crate) const HEADER: Style = Style::new().bold();
 
 pub(crate) const SOURCE: Style = AnsiColor::Blue.on_default();
 pub(crate) const ATTR_PATH: Style = AnsiColor::Cyan.on_default();
+pub(crate) const ATTR_PATH_QUOTED: Style = AnsiColor::Green.on_default();
 pub(crate) const WORKTREE: Style = AnsiColor::Magenta.on_default();
 
 pub(crate) const EQUAL: Style = AnsiColor::Green.on_default();

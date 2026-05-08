@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use eyre::WrapErr;
+
 use crate::{
     attr_path::AttrPath,
     command::Cmd,
@@ -66,7 +68,9 @@ pub(crate) fn get_drv_path(
 
     match source {
         Source::Flake(flake_path) => {
-            let fragment = attr_path.to_flake_fragment();
+            let fragment = attr_path.to_flake_fragment().wrap_err_with(|| {
+                format!("failed to evaluate derivation path of flake output {attr_path:?}")
+            })?;
             let flake_ref = if let Some(rev) = commit_id {
                 format!("{}?rev={}#{}", flake_path.as_str(), rev, fragment)
             } else {
@@ -75,34 +79,42 @@ pub(crate) fn get_drv_path(
 
             cmd.args(["--", &flake_ref]).output_json()
         }
-        Source::File(path) => match commit_id {
-            None => cmd
-                .arg("--file")
-                .arg(path)
-                .args(["--", &attr_path.to_cli_arg().to_string()])
-                .output_json(),
-            Some(rev) => {
-                let Ok(path_relative) = path.strip_prefix(repo_root) else {
-                    unreachable!("repo_root should be a prefix of the file path");
-                };
+        Source::File(path) => {
+            let attribute = attr_path
+                .to_cli_arg()
+                .wrap_err_with(|| {
+                    format!("failed to evaluate derivation path of attribute {attr_path:?}")
+                })?
+                .to_string();
+            match commit_id {
+                None => cmd
+                    .arg("--file")
+                    .arg(path)
+                    .args(["--", &attribute])
+                    .output_json(),
+                Some(rev) => {
+                    let Ok(path_relative) = path.strip_prefix(repo_root) else {
+                        unreachable!("repo_root should be a prefix of the file path");
+                    };
 
-                const EXPR: &str = "{repoRoot, pathInRepo, rev}: \
-                    let \
-                      repo = builtins.fetchGit { url = /. + repoRoot; inherit rev; }; \
-                      path = if pathInRepo == \"\" then repo else repo + \"/${pathInRepo}\"; \
-                      autoApply = x: if builtins.isFunction x then x {} else x; \
-                    in \
-                    autoApply (import path)";
+                    const EXPR: &str = "{repoRoot, pathInRepo, rev}: \
+                        let \
+                          repo = builtins.fetchGit { url = /. + repoRoot; inherit rev; }; \
+                          path = if pathInRepo == \"\" then repo else repo + \"/${pathInRepo}\"; \
+                          autoApply = x: if builtins.isFunction x then x {} else x; \
+                        in \
+                        autoApply (import path)";
 
-                cmd.args(["--impure", "--expr", EXPR])
-                    .args(["--argstr", "repoRoot"])
-                    .arg(repo_root)
-                    .args(["--argstr", "pathInRepo"])
-                    .arg(path_relative)
-                    .args(["--argstr", "rev", rev])
-                    .args(["--", &attr_path.to_cli_arg().to_string()])
-                    .output_json()
+                    cmd.args(["--impure", "--expr", EXPR])
+                        .args(["--argstr", "repoRoot"])
+                        .arg(repo_root)
+                        .args(["--argstr", "pathInRepo"])
+                        .arg(path_relative)
+                        .args(["--argstr", "rev", rev])
+                        .args(["--", &attribute])
+                        .output_json()
+                }
             }
-        },
+        }
     }
 }
