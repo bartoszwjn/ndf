@@ -11,6 +11,10 @@ pub(crate) const WORKTREE: Style = AnsiColor::Magenta.on_default();
 
 pub(crate) const EQUAL: Style = AnsiColor::Green.on_default();
 pub(crate) const NOT_EQUAL: Style = AnsiColor::Red.on_default();
+pub(crate) const UNKNOWN: Style = AnsiColor::BrightBlack.on_default();
+
+pub(crate) const EVAL_SUCCESS: Style = Style::new();
+pub(crate) const EVAL_ERROR: Style = AnsiColor::Red.on_default();
 
 pub(crate) const FROM: Style = AnsiColor::Red.on_default().bold();
 pub(crate) const TO: Style = AnsiColor::Green.on_default().bold();

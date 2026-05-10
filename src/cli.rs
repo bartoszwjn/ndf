@@ -12,6 +12,7 @@ use crate::{
     attr_path::AttrPath,
     diff_spec::{DiffSpec, FlakePath, Revision, Source},
     eval, git, nix,
+    summary::EvalResultCmp,
 };
 
 const AFTER_HELP: &str = "\
@@ -129,15 +130,15 @@ impl NdfApp {
 
         anstream::print!("{summary}");
 
-        let all_equal = summary
-            .items
-            .iter()
-            .all(|item| item.old_drv_path == item.new_drv_path);
-        Ok(if all_equal {
-            ExitCode::SUCCESS
-        } else {
-            ExitCode::from(1)
-        })
+        let exit_code = summary.items.iter().fold(0, |acc, item| {
+            acc.max(match item.result_old.compare(&item.result_new) {
+                EvalResultCmp::Equal => 0,
+                EvalResultCmp::NotEqual => 1,
+                EvalResultCmp::Unknown => 2,
+            })
+        });
+
+        Ok(ExitCode::from(exit_code))
     }
 
     pub fn default_log_level(&self) -> tracing::Level {

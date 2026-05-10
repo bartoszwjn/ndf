@@ -1,24 +1,31 @@
 use crate::{
-    attr_path::AttrPath, cli::DiffTool, command::Cmd, diff_spec::DiffSpec, eval::EvalSpec,
-    summary::SummaryItem,
+    attr_path::AttrPath,
+    cli::DiffTool,
+    command::Cmd,
+    diff_spec::DiffSpec,
+    eval::EvalSpec,
+    summary::{EvalResult, SummaryItem},
 };
 
 pub(crate) fn compare_paths<'spec>(
     attr_path: &'spec AttrPath,
     spec: &'spec DiffSpec,
-    mut get_drv_path: impl FnMut(EvalSpec<'spec>) -> eyre::Result<String>,
+    mut eval: impl FnMut(EvalSpec<'spec>) -> EvalResult,
 ) -> eyre::Result<SummaryItem> {
     let lhs_spec = EvalSpec::lhs(spec, attr_path);
     let rhs_spec = EvalSpec::rhs(spec, attr_path);
-    let old_drv_path = get_drv_path(lhs_spec)?;
-    let new_drv_path = get_drv_path(rhs_spec)?;
+    let result_old = eval(lhs_spec);
+    let result_new = eval(rhs_spec);
 
     match spec.tool {
         DiffTool::None => {}
         DiffTool::NixDiff => {
-            if old_drv_path != new_drv_path {
+            if let EvalResult::DrvPath(old_drv_path) = &result_old
+                && let EvalResult::DrvPath(new_drv_path) = &result_new
+                && old_drv_path != new_drv_path
+            {
                 print_pair_cmp(lhs_spec.attr_path, rhs_spec.attr_path, spec);
-                run_nix_diff(&old_drv_path, &new_drv_path)?;
+                run_nix_diff(old_drv_path, new_drv_path)?;
                 anstream::println!();
             }
         }
@@ -27,8 +34,8 @@ pub(crate) fn compare_paths<'spec>(
     Ok(SummaryItem {
         base: spec.base.clone(),
         attr_path: attr_path.clone(),
-        old_drv_path,
-        new_drv_path,
+        result_old,
+        result_new,
     })
 }
 

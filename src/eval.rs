@@ -10,7 +10,7 @@ use crate::{
     compare,
     diff_spec::DiffSpec,
     nix,
-    summary::{Summary, SummaryItem},
+    summary::{EvalResult, Summary, SummaryItem},
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -34,8 +34,18 @@ impl<'spec> EvalSpec<'spec> {
         }
     }
 
-    pub(crate) fn run(&self, spec: &DiffSpec) -> eyre::Result<String> {
-        nix::get_drv_path(&spec.repo, &spec.source, self.commit_id, self.attr_path)
+    pub(crate) fn run(&self, spec: &DiffSpec) -> EvalResult {
+        let attr_path = self.attr_path;
+        let commit_id = self.commit_id;
+        tracing::error_span!("eval_drv_path", ?attr_path, commit_id).in_scope(|| {
+            match nix::get_drv_path(&spec.repo, &spec.source, commit_id, attr_path) {
+                Ok(drv_path) => EvalResult::DrvPath(drv_path),
+                Err(error) => {
+                    tracing::error!("{error:?}");
+                    EvalResult::Error
+                }
+            }
+        })
     }
 }
 
@@ -56,17 +66,17 @@ pub(crate) fn eval_and_compare_paths(
 /// and evaluation is delayed until the result is needed for the first time.
 /// That way we don't have to wait for all evalutations before showing the first diff.
 fn eval_and_compare_paths_sequential(spec: &DiffSpec) -> eyre::Result<Vec<SummaryItem>> {
-    let mut cached_results = HashMap::<EvalSpec, eyre::Result<String>>::new();
-    let mut get_drv_path = |eval_spec| {
-        let result = cached_results
+    let mut cached_results = HashMap::<EvalSpec, EvalResult>::new();
+    let mut eval = |eval_spec| {
+        cached_results
             .entry(eval_spec)
-            .or_insert_with(|| eval_spec.run(spec));
-        extract_cached_drv_path_result(result)
+            .or_insert_with(|| eval_spec.run(spec))
+            .clone()
     };
 
     spec.attr_paths
         .iter()
-        .map(|attr_path| compare::compare_paths(attr_path, spec, &mut get_drv_path))
+        .map(|attr_path| compare::compare_paths(attr_path, spec, &mut eval))
         .collect::<Result<Vec<_>, _>>()
 }
 
@@ -81,33 +91,21 @@ fn eval_and_compare_paths_parallel(
         .iter()
         .flat_map(|path| [EvalSpec::lhs(spec, path), EvalSpec::rhs(spec, path)])
         .collect();
-    let mut cached_results: HashMap<EvalSpec, eyre::Result<String>> = thread_pool.install(|| {
+    let mut cached_results: HashMap<EvalSpec, EvalResult> = thread_pool.install(|| {
         eval_jobs
             .par_iter()
             .map(|job| (*job, job.run(spec)))
             .collect()
     });
-    let mut get_drv_path = |eval_spec| {
-        let result = cached_results
+    let mut eval = |eval_spec| {
+        cached_results
             .get_mut(&eval_spec)
-            .expect("all results are precomputed");
-        extract_cached_drv_path_result(result)
+            .expect("all results are precomputed")
+            .clone()
     };
 
     spec.attr_paths
         .iter()
-        .map(|attr_path| compare::compare_paths(attr_path, spec, &mut get_drv_path))
+        .map(|attr_path| compare::compare_paths(attr_path, spec, &mut eval))
         .collect::<Result<Vec<_>, _>>()
-}
-
-fn extract_cached_drv_path_result(result: &mut eyre::Result<String>) -> eyre::Result<String> {
-    match result {
-        Ok(drv_path) => Ok(drv_path.clone()),
-        Err(error) => {
-            // eyre errors can't be cloned, return the error we have saved and leave
-            // a placeholder error in case someone tries to get the same result again.
-            let placeholder = eyre::eyre!("failed to evaluate derivation path");
-            Err(std::mem::replace(error, placeholder))
-        }
-    }
 }

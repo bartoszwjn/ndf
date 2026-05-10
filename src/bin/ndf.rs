@@ -60,6 +60,7 @@ fn init_tracing(default_level: tracing::Level) {
     let fmt = {
         let base = tracing_subscriber::fmt::layer()
             .with_target(show_target)
+            .with_ansi_sanitization(false)
             .with_writer(move || AutoStream::new(std::io::stderr().lock(), color_choice));
         if show_time {
             base.boxed()
