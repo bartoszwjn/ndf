@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail -- {0}
+
 jobs:
   nix-checks:
     name: Nix checks - ${{ matrix.os }}
@@ -50,7 +54,6 @@ jobs:
           purge-last-accessed: P2D
 
       - name: Run nix checks
-        shell: bash -euo pipefail {0}
         run: |
           # Build all check outputs of the flake, just like `nix flake check`,
           # but also create gc roots.
@@ -63,10 +66,117 @@ jobs:
                 --out-link .gc-roots/check
 
       - name: Save flake inputs
-        shell: bash -euo pipefail {0}
         run: |
           # Create gc roots pointing to flake inputs.
           nix flake archive --no-update-lock-file --json \
             | jq --raw-output 'recurse(.inputs[]) | .path' \
             | xargs nix build --no-update-lock-file --keep-going --print-build-logs \
                 --out-link .gc-roots/input
+
+  integration-tests:
+    name: Integration tests - ${{ matrix.nix }} - ${{ matrix.os.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - { runner: ubuntu-latest, nix_system: x86_64-linux }
+          - { runner: macos-latest, nix_system: aarch64-darwin }
+        nix: [ CppNix, Lix ]
+    runs-on: ${{ matrix.os.runner }}
+    env:
+      CPPNIX_VERSION: "2.34.7"
+      LIX_VERSION: "2.95.2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install CppNix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+        if: ${{ matrix.nix == 'CppNix' }}
+        with:
+          install_url: https://releases.nixos.org/nix/nix-${{ env.CPPNIX_VERSION }}/install
+          extra_nix_config: |
+            experimental-features =
+
+      - name: Cache Lix installer
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        if: ${{ matrix.nix == 'Lix' }}
+        with:
+          key: lix-installer-${{ env.LIX_VERSION }}-${{ matrix.os.nix_system }}
+          path: |
+            /tmp/lix-installer
+
+      - name: Install Lix
+        if: ${{ matrix.nix == 'Lix' }}
+        run: |
+          PS4=">>> "
+          set -x
+
+          installer_dir="/tmp/lix-installer"
+          installer_version="${installer_dir}/version"
+          installer_bin="${installer_dir}/lix-installer"
+          lix_tarball="${installer_dir}/lix.tar.xz"
+
+          installer_url="https://install.lix.systems/lix/${LIX_VERSION}/lix-installer-${{ matrix.os.nix_system }}"
+          lix_url="https://releases.lix.systems/lix/lix-${LIX_VERSION}/lix-${LIX_VERSION}-${{ matrix.os.nix_system }}.tar.xz"
+
+          mkdir -p "$installer_dir"
+
+          if [ -f "$installer_version" ]; then
+            cached_version="$(cat "$installer_version")"
+          else
+            cached_version=""
+          fi
+          if [ "$cached_version" = "$LIX_VERSION" ]; then
+            version_matches=true
+          else
+            version_matches=false
+          fi
+          if [ "$version_matches" != "true" ]; then
+            curl -o "$installer_bin" -sSfL "$installer_url"
+            curl -o "$lix_tarball" -sSfL "$lix_url"
+            chmod +x "$installer_bin"
+            printf "%s\n" "$LIX_VERSION" > "$installer_version"
+          fi
+
+          NIX_INSTALLER_ENABLE_FLAKES=false "$installer_bin" install --no-confirm --nix-package-url "file://${lix_tarball}"
+
+          # Disable all experimental features and get rid of any settings that rely on them.
+          printf "experimental-features =\n" | sudo tee -a /etc/nix/nix.conf > /dev/null
+          sudo sed -i -e 's/^bash-prompt-prefix =.*$//' /etc/nix/nix.conf
+
+      - name: Show Nix version
+        run: |
+          PS4=">>> "
+          set -x
+
+          nix-instantiate --version
+          nix-instantiate --eval --strict --expr '{ inherit (builtins) currentSystem langVersion nixVersion storeDir; }'
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Show cargo version
+        run: cargo version --verbose
+
+      - name: Cache Cargo artifacts
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+
+      - name: Run cargo fetch
+        run: cargo fetch --locked
+
+      - name: Run cargo build
+        run: cargo build --frozen --workspace --test integration
+
+      - name: Run cargo test
+        run: cargo test --frozen --workspace --test integration
