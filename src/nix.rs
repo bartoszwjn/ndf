@@ -10,6 +10,7 @@ use crate::{
 
 fn get_current_system() -> eyre::Result<String> {
     Cmd::nix()
+        .args(["--extra-experimental-features", "nix-command"])
         .args([
             "eval",
             "--impure",
@@ -26,6 +27,7 @@ pub(crate) fn get_flake_packages(flake_path: &FlakePath) -> eyre::Result<Vec<Str
         format!("flake: builtins.attrNames (flake.packages.{current_system} or {{}})");
     let flake_ref = format!("{}#.", flake_path.as_str());
     Cmd::nix()
+        .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["eval", "--json", "--apply", &package_names_fn, "--"])
         .arg(flake_ref)
         .output_json()
@@ -35,6 +37,7 @@ pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Re
     let nixos_names_fn = "flake: builtins.attrNames (flake.nixosConfigurations or {})";
     let flake_ref = format!("{}#.", flake_path.as_str());
     Cmd::nix()
+        .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["eval", "--json", "--apply", nixos_names_fn, "--"])
         .arg(flake_ref)
         .output_json()
@@ -43,6 +46,7 @@ pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Re
 pub(crate) fn get_file_output_attributes(file: &Path) -> eyre::Result<Vec<String>> {
     let attr_names_fn = "x: builtins.attrNames (if builtins.isFunction x then x {} else x)";
     Cmd::nix()
+        .args(["--extra-experimental-features", "nix-command"])
         .args(["eval", "--json", "--apply", attr_names_fn, "--file"])
         .arg(file)
         .output_json()
@@ -55,6 +59,14 @@ pub(crate) fn get_drv_path(
     attr_path: &AttrPath,
 ) -> eyre::Result<String> {
     let mut cmd = Cmd::nix();
+    match source {
+        Source::Flake(_) => {
+            cmd.args(["--extra-experimental-features", "nix-command flakes"]);
+        }
+        Source::File(_) => {
+            cmd.args(["--extra-experimental-features", "nix-command"]);
+        }
+    }
     cmd.args([
         "eval",
         // Eval cache hardly works, sometimes it even seems to make things slower.
