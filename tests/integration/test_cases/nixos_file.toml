@@ -1,0 +1,51 @@
+[command]
+args = ["--file", "nixos.nix", "--nixos"]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."nixos.nix" = """
+let
+  drv = import ./drv.nix;
+  nixos = name: { config.system.build.toplevel = drv name; };
+in
+{
+  nixos1 = nixos "nixos1-1";
+  nixos2 = nixos "nixos2";
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."nixos.nix" = """
+let
+  drv = import ./drv.nix;
+  nixos = name: { config.system.build.toplevel = drv name; };
+in
+{
+  nixos1 = nixos "nixos1-2";
+  nixos2 = nixos "nixos2";
+}
+"""
+
+[outputs]
+exit_code = 1
+stdout = """
+File:  @REPO@/nixos.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  none
+Attribute paths:
+  nixos1.config.system.build.toplevel
+  nixos2.config.system.build.toplevel
+
+Summary:
+  nixos1.config.system.build.toplevel /nix/store/j54xzm2nfh4ighlbdll5fqxmnjch1d0h-nixos1-1.drv
+  !=                                  /nix/store/v7lw095ayml3r8z6ggwld1h1hqc1h680-nixos1-2.drv
+
+  nixos2.config.system.build.toplevel /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
+  ==                                  /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
+"""
+stderr = ""

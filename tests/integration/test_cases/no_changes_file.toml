@@ -1,0 +1,55 @@
+[command]
+args = ["--file", "."]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."default.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1";
+  pkg2 = drv "pkg2";
+  pkg3 = drv "pkg3";
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."default.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1";
+  pkg2 = drv "pkg2";
+  pkg3 = drv "pkg3";
+}
+"""
+
+[outputs]
+exit_code = 0
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  none
+Attribute paths:
+  pkg1
+  pkg2
+  pkg3
+
+Summary:
+  pkg1 /nix/store/isn04dmf5r96lnv0jg1gd29cnbb5n1v6-pkg1.drv
+  ==   /nix/store/isn04dmf5r96lnv0jg1gd29cnbb5n1v6-pkg1.drv
+
+  pkg2 /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+  ==   /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+
+  pkg3 /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
+  ==   /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
+"""
+stderr = ""

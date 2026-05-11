@@ -1,0 +1,14 @@
+# Common files included in all test cases.
+[files]
+"drv.nix" = """
+# Helper for creating dummy derivations.
+name:
+derivation {
+  inherit name;
+  system = "x86_64-linux";
+  builder = builtins.toFile "dummy-builder.sh" ''
+    #!/bin/sh
+    touch $out
+  '';
+}
+"""

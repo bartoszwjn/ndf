@@ -1,0 +1,60 @@
+[command]
+args = []
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        pkg1 = drv "pkg1-1";
+        pkg2 = drv "pkg2";
+      };
+    };
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        pkg1 = drv "pkg1-2";
+        pkg3 = drv "pkg3";
+      };
+    };
+}
+"""
+
+[outputs]
+exit_code = 2
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  none
+Attribute paths:
+  pkg1
+  pkg3
+
+Summary:
+  pkg1 /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv
+  !=   /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv
+
+  pkg3 error
+  ??   /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
+"""

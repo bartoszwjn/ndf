@@ -1,0 +1,22 @@
+[command]
+args = ["--file", "."]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files = {}
+
+[[repo_contents.commits]]
+message = "commit 2"
+files = {}
+
+[outputs]
+exit_code = 2
+stdout = ""
+stderr = """
+error:
+   0: invalid value for option '--file': "."
+   1: failed to query metadata of "@REPO@/default.nix"
+   2: No such file or directory (os error 2)
+"""

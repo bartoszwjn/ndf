@@ -1,0 +1,21 @@
+[command]
+args = []
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files = {}
+
+[[repo_contents.commits]]
+message = "commit 2"
+files = {}
+
+[outputs]
+exit_code = 2
+stdout = ""
+stderr = """
+error:
+   0: invalid value for option '--flake': "."
+   1: path "@REPO@" is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)
+"""

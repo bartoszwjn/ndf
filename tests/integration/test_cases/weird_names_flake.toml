@@ -1,0 +1,81 @@
+[command]
+# run sequentially, so that the order of logs is deterministic
+args = ["-j", "1"]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        normal = drv "normal";
+        "with whitespace" = drv "whitespace";
+        "with.dots.tld" = drv "dots";
+        "with\\"quotes\\"" = drv "quotes";
+      };
+    };
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        normal = drv "normal";
+        "with whitespace" = drv "whitespace";
+        "with.dots.tld" = drv "dots";
+        "with\\"quotes\\"" = drv "quotes";
+      };
+    };
+}
+"""
+
+[outputs]
+exit_code = 2
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  none
+Attribute paths:
+  normal
+  "with whitespace"
+  "with"quotes""
+  "with.dots.tld"
+
+Summary:
+  normal /nix/store/mkm5mf5kbiy1b1pm7nib559wbfm71dgl-normal.drv
+  ==     /nix/store/mkm5mf5kbiy1b1pm7nib559wbfm71dgl-normal.drv
+
+  "with whitespace" /nix/store/l876zpacfdqp2dfm5jg29c9sgnlili4j-whitespace.drv
+  ==                /nix/store/l876zpacfdqp2dfm5jg29c9sgnlili4j-whitespace.drv
+
+  "with"quotes"" error
+  ??             error
+
+  "with.dots.tld" /nix/store/jcskvri420cy0hxqxj817kr9zbv69axj-dots.drv
+  ==              /nix/store/jcskvri420cy0hxqxj817kr9zbv69axj-dots.drv
+"""
+stderr = '''
+ERROR eval_drv_path{attr_path="with\"quotes\"" commit_id="@COMMIT_1_ID@"}: 
+   0: failed to evaluate derivation path of flake output "with\"quotes\""
+   1: attribute paths containing '"' cannot be passed to Nix on the command line
+ERROR eval_drv_path{attr_path="with\"quotes\"" commit_id="@COMMIT_2_ID@"}: 
+   0: failed to evaluate derivation path of flake output "with\"quotes\""
+   1: attribute paths containing '"' cannot be passed to Nix on the command line
+'''

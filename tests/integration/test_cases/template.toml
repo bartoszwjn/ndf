@@ -1,0 +1,61 @@
+# This file is a template for creating test cases,
+# it's intentionally not registered as a test case.
+[command]
+args = []
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."default.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  TODO
+}
+"""
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        TODO
+      };
+    };
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."default.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  TODO
+}
+"""
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        TODO
+      };
+    };
+}
+"""
+
+[outputs]
+exit_code = 42
+stdout = ""
+stderr = ""

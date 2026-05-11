@@ -1,0 +1,61 @@
+[command]
+args = ["--flake", "./in/a/subdir"]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."in/a/subdir/flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ../../../drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        pkg1 = drv "pkg1-1";
+        pkg2 = drv "pkg2";
+      };
+    };
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."in/a/subdir/flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ../../../drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        pkg1 = drv "pkg1-2";
+        pkg2 = drv "pkg2";
+      };
+    };
+}
+"""
+
+[outputs]
+exit_code = 1
+stdout = """
+Flake: @REPO@/in/a/subdir
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  none
+Attribute paths:
+  pkg1
+  pkg2
+
+Summary:
+  pkg1 /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv
+  !=   /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv
+
+  pkg2 /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+  ==   /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+"""
+stderr = ""
