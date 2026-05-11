@@ -57,7 +57,14 @@ let
     '';
   };
 
-  test = craneLib.cargoTest (commonArgs // { cargoTestExtraArgs = "--workspace"; });
+  test = craneLib.cargoTest (
+    commonArgs
+    // {
+      # Skip integration tests, since those need to be able to execute Nix commands,
+      # which is hard to do inside a Nix build sandbox.
+      cargoTestExtraArgs = "--workspace --lib --bins --examples";
+    }
+  );
 in
 
 craneLib.buildPackage (
