@@ -18,7 +18,7 @@ fn main() -> ExitCode {
         // Aborting panic raises SIGABRT (6).
         Err(error) => {
             const RED_BOLD: Style = AnsiColor::Red.on_default().bold();
-            anstream::eprintln!("{RED_BOLD}error:{RED_BOLD:#} {error:?}");
+            anstream::eprintln!("{RED_BOLD}error:{RED_BOLD:#}{error:?}");
             ExitCode::from(2)
         }
     }
