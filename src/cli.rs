@@ -330,7 +330,22 @@ fn validate_file_argument(file: &OsStr) -> eyre::Result<PathBuf> {
         }
     }
 
-    fs::canonicalize(file).wrap_err_with(|| format!("failed to resolve path {file:?}"))
+    let mut absolute =
+        fs::canonicalize(file).wrap_err_with(|| format!("failed to resolve path {file:?}"))?;
+    let mut metadata = fs::metadata(&absolute)
+        .wrap_err_with(|| format!("failed to query metadata of {absolute:?}"))?;
+
+    if metadata.file_type().is_dir() {
+        absolute.push("default.nix");
+        metadata = fs::metadata(&absolute)
+            .wrap_err(format!("failed to query metadata of {absolute:?}"))?;
+    }
+
+    if metadata.file_type().is_dir() {
+        bail!("{absolute:?} is a directory");
+    }
+
+    Ok(absolute)
 }
 
 fn resolve_git_commit(commit: Option<&str>, repo_root: &Path) -> eyre::Result<Revision> {
