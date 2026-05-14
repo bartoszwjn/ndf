@@ -47,6 +47,10 @@
           programs.keep-sorted.enable = true;
           programs.rustfmt.enable = true;
           programs.taplo.enable = true;
+
+          settings.formatter.taplo.excludes = [
+            "crates/workspace-hack/Cargo.toml"
+          ];
         };
 
         packageName = "ndf";

@@ -29,3 +29,10 @@ tracing-error = "0.2.1"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 unicode-width = { version = "0.2.2", default-features = false }
 workspace-hack = { version = "0.1", path = "crates/workspace-hack" }
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
+serde = { version = "1.0.228", features = ["derive"] }
+tempfile = "3.27.0"
+toml = { version = "1.1.2", features = ["std", "parse", "serde"] }
+toml_edit = "0.25.11"
