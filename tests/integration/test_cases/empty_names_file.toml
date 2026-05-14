@@ -1,0 +1,53 @@
+# In `--file` mode both CppNix (2.34.7) and Lix (2.95.2) error out with
+# `empty attribute name in selection path '...'`.
+#
+# Future versions of Lix should allow this, a relevant change has already been merged:
+# https://git.lix.systems/lix-project/lix/commit/2a11984a58a96b37685b563d3c2cd975a81f44c2
+[command]
+args = ["--file", "empty.nix", '""', 'foo."".bar']
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."empty.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  "" = drv "empty";
+  foo."".bar = drv "foobar";
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."empty.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  "" = drv "empty";
+  foo."".bar = drv "foobar";
+}
+"""
+
+[outputs]
+exit_code = 2
+stdout = """
+File:  @REPO@/empty.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  none
+Attribute paths:
+  ""
+  foo."".bar
+
+Summary:
+  "" error
+  ?? error
+
+  foo."".bar error
+  ??         error
+"""

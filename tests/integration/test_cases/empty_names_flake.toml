@@ -1,0 +1,62 @@
+# Both CppNix (2.34.7) and Lix (2.95.2) technically allow empty attribute names in flake outputs,
+# but the attribute paths are sometimes parsed differently between implementations.
+[command]
+args = [
+  # '""', # `""` works fine with Lix, but CppNix treats it as an attr path with no components.
+  'foo."".bar',
+]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        "" = drv "empty";
+        foo."".bar = drv "foobar";
+      };
+    };
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        "" = drv "empty";
+        foo."".bar = drv "foobar";
+      };
+    };
+}
+"""
+
+[outputs]
+exit_code = 0
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  none
+Attribute paths:
+  foo."".bar
+
+Summary:
+  foo."".bar /nix/store/6kpmixa64q8ivx4zzm7z4fcjn021fpj2-foobar.drv
+  ==         /nix/store/6kpmixa64q8ivx4zzm7z4fcjn021fpj2-foobar.drv
+"""
+stderr = ""

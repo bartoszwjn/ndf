@@ -32,6 +32,8 @@ test_cases!(
     different_outputs_flake,
     dirty_worktree_file,
     dirty_worktree_flake,
+    empty_names_file,
+    empty_names_flake,
     empty_repo_file,
     empty_repo_flake,
     function_file,
