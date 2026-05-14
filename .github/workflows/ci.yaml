@@ -69,7 +69,7 @@ jobs:
                 --out-link .gc-roots/input
 
   integration-tests:
-    name: Integration tests - ${{ matrix.nix }} - ${{ matrix.os.runner }}
+    name: Integration tests - ${{ matrix.nix }} - ${{ matrix.os.nix_system }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
