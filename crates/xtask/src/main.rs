@@ -1,7 +1,6 @@
 use clap::Parser;
 
 mod common;
-mod examples;
 
 fn main() -> eyre::Result<()> {
     let app = XtaskApp::parse();
@@ -11,20 +10,13 @@ fn main() -> eyre::Result<()> {
 
 /// Custom commands used for development.
 #[derive(clap::Parser, Debug)]
-struct XtaskApp {
-    #[command(subcommand)]
-    subcommand: Subcommand,
-}
+struct XtaskApp {}
 
 impl XtaskApp {
     fn exec(self) -> eyre::Result<()> {
-        match self.subcommand {
-            Subcommand::Examples(examples_args) => examples_args.exec(),
-        }
+        let root = common::workspace_root();
+        println!("Custom commands for the workspace at {}", root.display());
+        println!("There are currently no custom commands");
+        Ok(())
     }
-}
-
-#[derive(clap::Subcommand, Debug)]
-enum Subcommand {
-    Examples(examples::Args),
 }

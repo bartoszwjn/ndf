@@ -22,11 +22,3 @@ integration-tests-cppnix *args:
 # Run integration tests with a Lix binary in PATH
 integration-tests-lix *args:
     nix shell --inputs-from . nixpkgs#lix --command cargo test --test integration {{ args }}
-
-# Prepare all example directories
-make-examples *args:
-    cargo xtask examples make {{ args }}
-
-# Clean up all example directories
-clean-examples *args:
-    cargo xtask examples clean {{ args }}
