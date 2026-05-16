@@ -331,7 +331,6 @@ dependencies = [
  "tracing-error",
  "tracing-subscriber",
  "unicode-width",
- "workspace-hack",
 ]
 
 [[package]]
@@ -718,27 +717,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "workspace-hack"
-version = "0.1.0"
-dependencies = [
- "memchr",
- "proc-macro2",
- "quote",
- "serde",
- "serde_core",
- "syn",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "xtask"
 version = "0.0.0"
 dependencies = [
  "clap",
  "color-eyre",
  "eyre",
- "workspace-hack",
 ]
 
 [[package]]

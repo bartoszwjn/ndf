@@ -1,7 +1,6 @@
 {
   lib,
   craneLib,
-  cargo-hakari,
 }:
 
 let
@@ -41,22 +40,6 @@ let
     cargoExtraArgs = "--all"; # `--workspace` equivalent
   };
 
-  hakari = craneLib.mkCargoDerivation {
-    inherit (baseArgs) src strictDeps;
-
-    pname = "${cargoToml.package.name}-hakari";
-    cargoArtifacts = null;
-    doInstallCargoArtifacts = false;
-
-    nativeBuildInputs = [ cargo-hakari ];
-
-    buildPhaseCargoCommand = ''
-      cargo hakari generate --diff
-      cargo hakari manage-deps --dry-run
-      cargo hakari verify
-    '';
-  };
-
   test = craneLib.cargoTest (
     commonArgs
     // {
@@ -91,7 +74,6 @@ craneLib.buildPackage (
         deny
         doc
         fmt
-        hakari
         test
         # keep-sorted end
         ;
