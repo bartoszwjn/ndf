@@ -11,6 +11,10 @@ check:
 update-integration-tests *test_names:
     NDF_TESTS_UPDATE=1 cargo test --test integration -- --exact {{ test_names }}
 
+# Run integration tests
+integration-tests *args:
+    cargo test --test integration {{ args }}
+
 # Run integration tests with a CppNix binary in PATH
 integration-tests-cppnix *args:
     nix shell --inputs-from . nixpkgs#nix --command cargo test --test integration {{ args }}

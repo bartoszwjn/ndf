@@ -7,7 +7,6 @@ use std::{
 };
 
 use color_eyre::{Section, SectionExt};
-use tempfile::TempDir;
 use toml_edit::DocumentMut;
 
 use crate::{
@@ -62,13 +61,14 @@ type Substitutions = Vec<(String, String)>;
 
 impl TestCase {
     pub(crate) fn run(name: &str) -> eyre::Result<()> {
-        let dir = TempDir::with_prefix(format!("ndf_test_{name}_"))?;
-        let dir_path = dir.path().canonicalize()?;
-        eprintln!("running test case in {}", dir_path.display());
+        let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("test_cases/{name}"));
+        prepare_dir(&dir)?;
+        let dir = dir.canonicalize()?;
+        eprintln!("running test case in {}", dir.display());
 
         let mut substitutions = vec![
             ("@SYSTEM@".to_owned(), nix::get_current_system()?),
-            ("@REPO@".to_owned(), dir_path.to_str().unwrap().to_owned()),
+            ("@REPO@".to_owned(), dir.to_str().unwrap().to_owned()),
         ];
 
         let common = Common::read(&substitutions)?;
@@ -77,13 +77,13 @@ impl TestCase {
             .join(format!("tests/integration/test_cases/{name}.toml"));
         let test_case = Self::read(&config_path, &substitutions)?;
 
-        let commits = test_case.repo_contents.create(&dir_path, &common.files)?;
+        let commits = test_case.repo_contents.create(&dir, &common.files)?;
         for (commit_ix, commit) in commits.into_iter().enumerate() {
             substitutions.push((format!("@COMMIT_{commit_ix}_ID@"), commit.id));
             substitutions.push((format!("@COMMIT_{commit_ix}_SHORT_ID@"), commit.short_id));
         }
 
-        let output = test_case.command.run(&dir_path)?;
+        let output = test_case.command.run(&dir)?;
 
         if std::env::var_os("NDF_TESTS_UPDATE").is_some_and(|v| !v.is_empty()) {
             test_case
@@ -93,7 +93,6 @@ impl TestCase {
             test_case.outputs.check(&output, &substitutions)?;
         }
 
-        dir.close()?;
         Ok(())
     }
 
@@ -289,4 +288,17 @@ fn reverse_substitutions(s: impl Into<String>, substitutions: &Substitutions) ->
         s = s.replace(value, var);
     }
     s
+}
+
+fn prepare_dir(dir: &Path) -> eyre::Result<()> {
+    fs::create_dir_all(dir)?;
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            fs::remove_dir_all(entry.path())?;
+        } else {
+            fs::remove_file(entry.path())?;
+        }
+    }
+    Ok(())
 }
