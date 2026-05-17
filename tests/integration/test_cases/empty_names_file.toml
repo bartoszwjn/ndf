@@ -1,8 +1,3 @@
-# In `--file` mode both CppNix (2.34.7) and Lix (2.95.2) error out with
-# `empty attribute name in selection path '...'`.
-#
-# Future versions of Lix should allow this, a relevant change has already been merged:
-# https://git.lix.systems/lix-project/lix/commit/2a11984a58a96b37685b563d3c2cd975a81f44c2
 [command]
 args = ["--file", "empty.nix", '""', 'foo."".bar']
 
@@ -33,7 +28,7 @@ in
 """
 
 [outputs]
-exit_code = 2
+exit_code = 0
 stdout = """
 File:  @REPO@/empty.nix
 Repo:  @REPO@
@@ -45,9 +40,10 @@ Attribute paths:
   foo."".bar
 
 Summary:
-  "" error
-  ?? error
+  "" /nix/store/dxx3wb5c4wggz0dnirncm83qzhmsc3vg-empty.drv
+  == /nix/store/dxx3wb5c4wggz0dnirncm83qzhmsc3vg-empty.drv
 
-  foo."".bar error
-  ??         error
+  foo."".bar /nix/store/6kpmixa64q8ivx4zzm7z4fcjn021fpj2-foobar.drv
+  ==         /nix/store/6kpmixa64q8ivx4zzm7z4fcjn021fpj2-foobar.drv
 """
+stderr = ""

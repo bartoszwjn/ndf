@@ -26,6 +26,10 @@ impl Cmd {
         Self::new("nix")
     }
 
+    pub(crate) fn nix_instantiate() -> Self {
+        Self::new("nix-instantiate")
+    }
+
     pub(crate) fn git() -> Self {
         Self::new("git")
     }

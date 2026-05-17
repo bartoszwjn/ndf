@@ -56,6 +56,12 @@ impl AttrPath {
         );
     }
 
+    pub(crate) fn to_parts_json(&self) -> String {
+        let parts: &[String] = &self.parts;
+        serde_json::to_string(parts)
+            .expect("serializing a list of strings into a String cannot fail")
+    }
+
     /// Display the attr path in a form suitable for using as a command line argument to Nix.
     ///
     /// This can be used with the `-A`/`--attr` option of old-style Nix commands (e.g. `nix-build`),

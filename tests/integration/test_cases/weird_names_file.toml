@@ -1,6 +1,5 @@
 [command]
-# run sequentially, so that the order of logs is deterministic
-args = ["--file", "weird.nix", "-j", "1"]
+args = ["--file", "weird.nix"]
 
 [repo_contents]
 
@@ -33,7 +32,7 @@ in
 """
 
 [outputs]
-exit_code = 2
+exit_code = 0
 stdout = """
 File:  @REPO@/weird.nix
 Repo:  @REPO@
@@ -53,17 +52,10 @@ Summary:
   "with whitespace" /nix/store/l876zpacfdqp2dfm5jg29c9sgnlili4j-whitespace.drv
   ==                /nix/store/l876zpacfdqp2dfm5jg29c9sgnlili4j-whitespace.drv
 
-  "with"quotes"" error
-  ??             error
+  "with"quotes"" /nix/store/z00m35ghhzblf2d6w8al1yw13yaqzi2p-quotes.drv
+  ==             /nix/store/z00m35ghhzblf2d6w8al1yw13yaqzi2p-quotes.drv
 
   "with.dots.tld" /nix/store/jcskvri420cy0hxqxj817kr9zbv69axj-dots.drv
   ==              /nix/store/jcskvri420cy0hxqxj817kr9zbv69axj-dots.drv
 """
-stderr = '''
-ERROR eval_drv_path{attr_path="with\"quotes\"" commit_id="@COMMIT_1_ID@"}: 
-   0: failed to evaluate derivation path of attribute "with\"quotes\""
-   1: attribute paths containing '"' cannot be passed to Nix on the command line
-ERROR eval_drv_path{attr_path="with\"quotes\"" commit_id="@COMMIT_2_ID@"}: 
-   0: failed to evaluate derivation path of attribute "with\"quotes\""
-   1: attribute paths containing '"' cannot be passed to Nix on the command line
-'''
+stderr = ""
