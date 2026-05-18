@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fmt, path::Path};
 
 use eyre::WrapErr;
 
@@ -7,6 +7,9 @@ use crate::{
     command::Cmd,
     diff_spec::{FlakePath, Source},
 };
+
+#[cfg(test)]
+mod tests;
 
 fn get_current_system() -> eyre::Result<String> {
     Cmd::nix_instantiate()
@@ -17,23 +20,27 @@ fn get_current_system() -> eyre::Result<String> {
 
 pub(crate) fn get_flake_packages(flake_path: &FlakePath) -> eyre::Result<Vec<String>> {
     let current_system = get_current_system()?;
-    let package_names_fn =
-        format!("flake: builtins.attrNames (flake.packages.{current_system} or {{}})");
-    let flake_ref = format!("{}#.", flake_path.as_str());
+    let system = to_string_literal(&current_system);
     Cmd::nix()
         .args(["--extra-experimental-features", "nix-command flakes"])
-        .args(["eval", "--json", "--apply", &package_names_fn, "--"])
-        .arg(flake_ref)
+        .args(["eval", "--json"])
+        .args([
+            "--apply",
+            &format!("flake: builtins.attrNames (flake.packages.{system} or {{ }})"),
+        ])
+        .args(["--", &format!("{}#.", flake_path.as_str())])
         .output_json()
 }
 
 pub(crate) fn get_flake_nixos_configurations(flake_path: &FlakePath) -> eyre::Result<Vec<String>> {
-    let nixos_names_fn = "flake: builtins.attrNames (flake.nixosConfigurations or {})";
-    let flake_ref = format!("{}#.", flake_path.as_str());
     Cmd::nix()
         .args(["--extra-experimental-features", "nix-command flakes"])
-        .args(["eval", "--json", "--apply", nixos_names_fn, "--"])
-        .arg(flake_ref)
+        .args(["eval", "--json"])
+        .args([
+            "--apply",
+            "flake: builtins.attrNames (flake.nixosConfigurations or {})",
+        ])
+        .args(["--", &format!("{}#.", flake_path.as_str())])
         .output_json()
 }
 
@@ -93,7 +100,6 @@ fn get_drv_path_file(
     let Ok(path_relative) = file_path.strip_prefix(repo_root) else {
         unreachable!("repo_root must be a prefix of file_path")
     };
-    let attr_path_json = attr_path.to_parts_json();
 
     Cmd::nix_instantiate()
         .args(["--eval", "--strict", "--json", "--read-write-mode"])
@@ -107,6 +113,46 @@ fn get_drv_path_file(
         } else {
             ["--arg", "rev", "null"]
         })
-        .args(["--argstr", "attrPathJson", &attr_path_json])
+        .args(["--argstr", "attrPathJson", &attr_path.to_parts_json()])
         .output_json()
+}
+
+/// Formats a given string as a string literal value in the Nix expression language.
+///
+/// See: <https://nix.dev/manual/nix/2.34/language/string-literals.html>
+fn to_string_literal(s: &str) -> impl fmt::Display {
+    use std::fmt::Write;
+
+    fmt::from_fn(move |f| {
+        let mut s = s;
+        f.write_char('"')?;
+        while !s.is_empty() {
+            let mut next_escape_ix = s
+                .find(['"', '\\', '$', '\n', '\r', '\t'])
+                .unwrap_or(s.len());
+            while s[next_escape_ix..].starts_with('$') && !s[next_escape_ix..].starts_with("${") {
+                next_escape_ix = s[next_escape_ix + 1..]
+                    .find(['"', '\\', '$', '\n', '\r', '\t'])
+                    .map(|ix| ix + next_escape_ix + 1)
+                    .unwrap_or(s.len());
+            }
+
+            f.write_str(&s[..next_escape_ix])?;
+            s = &s[next_escape_ix..];
+
+            if let Some(c) = s.chars().next() {
+                f.write_char('\\')?;
+                match c {
+                    '"' | '\\' | '$' => f.write_char(c)?,
+                    '\n' => f.write_char('n')?,
+                    '\r' => f.write_char('r')?,
+                    '\t' => f.write_char('t')?,
+                    _ => unreachable!(),
+                }
+                s = &s[1..];
+            }
+        }
+        f.write_char('"')?;
+        Ok(())
+    })
 }
