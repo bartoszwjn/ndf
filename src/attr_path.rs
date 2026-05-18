@@ -1,7 +1,5 @@
 use std::fmt;
 
-use percent_encoding::{AsciiSet, CONTROLS};
-
 use crate::diff_spec::Source;
 
 #[cfg(test)]
@@ -68,66 +66,6 @@ impl AttrPath {
         let parts: &[String] = &self.parts;
         serde_json::to_string(parts)
             .expect("serializing a list of strings into a String cannot fail")
-    }
-
-    /// Display the attr path in a form suitable for using as a command line argument to Nix.
-    ///
-    /// This can be used with the `-A`/`--attr` option of old-style Nix commands (e.g. `nix-build`),
-    /// or the new-style Nix commands (e.g. `nix build`) as the installable argument
-    /// when using either `--file` or `--expr` options.
-    #[allow(dead_code)] // TODO: remove
-    fn to_cli_arg(&self) -> eyre::Result<impl fmt::Display> {
-        if self.parts.iter().any(|part| part.contains('"')) {
-            eyre::bail!(
-                "attribute paths containing '\"' cannot be passed to Nix on the command line"
-            )
-        }
-
-        Ok(fmt::from_fn(|f| {
-            if self.leading_dot {
-                write!(f, ".")?;
-            }
-
-            let mut first = true;
-            for part in &self.parts {
-                if first {
-                    first = false;
-                } else {
-                    write!(f, ".")?;
-                }
-
-                if Self::part_needs_quotes(part) {
-                    write!(f, "\"{part}\"")?;
-                } else {
-                    write!(f, "{part}")?;
-                }
-            }
-            Ok(())
-        }))
-    }
-
-    /// Display the attr path in a from suitable for using as part of a flake reference.
-    #[allow(dead_code)] // TODO: remove
-    fn to_flake_fragment(&self) -> eyre::Result<impl fmt::Display> {
-        use std::fmt::Write;
-
-        // https://url.spec.whatwg.org/#fragment-percent-encode-set
-        const FRAGMENT_PERCENT_ENCODE_SET: AsciiSet =
-            CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
-
-        struct Encoder<'a, 'b>(&'a mut fmt::Formatter<'b>);
-        impl Write for Encoder<'_, '_> {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                write!(
-                    &mut self.0,
-                    "{}",
-                    percent_encoding::utf8_percent_encode(s, &FRAGMENT_PERCENT_ENCODE_SET)
-                )
-            }
-        }
-
-        self.to_cli_arg()
-            .map(|res| fmt::from_fn(move |f| write!(Encoder(f), "{res}")))
     }
 
     pub(crate) fn display_width(&self) -> usize {

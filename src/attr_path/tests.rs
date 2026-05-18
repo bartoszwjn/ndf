@@ -13,46 +13,32 @@ fn mk<const N: usize>(leading_dot: bool, parts: [&str; N]) -> AttrPath {
 }
 
 #[test]
-fn cli_arg_roundtrip() -> eyre::Result<()> {
+fn parse_cli_arg() -> eyre::Result<()> {
     let cases = [
         // simple
-        ("a", mk(false, ["a"]), "a"),
-        (
-            "foo.bar.baz",
-            mk(false, ["foo", "bar", "baz"]),
-            "foo.bar.baz",
-        ),
+        ("a", mk(false, ["a"])),
+        ("foo.bar.baz", mk(false, ["foo", "bar", "baz"])),
         // leading dot
-        (".", mk(true, []), "."),
-        (".foo", mk(true, ["foo"]), ".foo"),
-        (".foo.bar", mk(true, ["foo", "bar"]), ".foo.bar"),
+        (".", mk(true, [])),
+        (".foo", mk(true, ["foo"])),
+        (".foo.bar", mk(true, ["foo", "bar"])),
         // quoting
-        ("\"foo\"", mk(false, ["foo"]), "foo"),
-        ("f\"o\"o", mk(false, ["foo"]), "foo"),
-        ("\".foo\"", mk(false, [".foo"]), "\".foo\""),
-        (
-            "\"foo.bar.baz\"",
-            mk(false, ["foo.bar.baz"]),
-            "\"foo.bar.baz\"",
-        ),
+        ("\"foo\"", mk(false, ["foo"])),
+        ("f\"o\"o", mk(false, ["foo"])),
+        ("\".foo\"", mk(false, [".foo"])),
+        ("\"foo.bar.baz\"", mk(false, ["foo.bar.baz"])),
         (
             "foo.\"bar.baz\".quux",
             mk(false, ["foo", "bar.baz", "quux"]),
-            "foo.\"bar.baz\".quux",
         ),
         (
             "foo.\"bar.baz\".quux.\"\".more\".\"dots",
             mk(false, ["foo", "bar.baz", "quux", "", "more.dots"]),
-            "foo.\"bar.baz\".quux.\"\".\"more.dots\"",
         ),
         // empty
-        ("", mk(false, []), ""),
-        ("\"\"", mk(false, [""]), "\"\""),
-        (
-            ".\"\".foo.\"\".bar",
-            mk(true, ["", "foo", "", "bar"]),
-            ".\"\".foo.\"\".bar",
-        ),
+        ("", mk(false, [])),
+        ("\"\"", mk(false, [""])),
+        (".\"\".foo.\"\".bar", mk(true, ["", "foo", "", "bar"])),
     ];
 
     for case in cases {
@@ -60,13 +46,6 @@ fn cli_arg_roundtrip() -> eyre::Result<()> {
         assert_eq!(
             parsed, case.1,
             "{:?}: unexpected result of AttrPath::parse_cli_arg",
-            case.0,
-        );
-
-        let unparsed = parsed.to_cli_arg()?.to_string();
-        assert_eq!(
-            unparsed, case.2,
-            "{:?}: unexpected result of AttrPath::to_cli_arg",
             case.0,
         );
     }
