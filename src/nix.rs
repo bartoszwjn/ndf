@@ -1,7 +1,5 @@
 use std::{fmt, path::Path};
 
-use eyre::WrapErr;
-
 use crate::{
     attr_path::AttrPath,
     command::Cmd,
@@ -70,13 +68,14 @@ fn get_drv_path_flake(
     commit_id: Option<&str>,
     attr_path: &AttrPath,
 ) -> eyre::Result<String> {
-    let fragment = attr_path.to_flake_fragment().wrap_err_with(|| {
-        format!("failed to evaluate derivation path of flake output {attr_path:?}")
-    })?;
-    let flake_ref = if let Some(rev) = commit_id {
-        format!("{}?rev={}#{}", flake_path.as_str(), rev, fragment)
+    let apply_expr_base = include_str!("nix/get-drv-path-flake.nix");
+    let attr_path_expr = to_string_list_literal(attr_path.as_parts());
+    let apply_expr = if attr_path.has_leading_dot() {
+        format!("({apply_expr_base}) {{ attrPath = {attr_path_expr}; system = null; }}")
     } else {
-        format!("{}#{}", flake_path.as_str(), fragment)
+        let current_system = get_current_system()?;
+        let system_expr = to_string_literal(&current_system);
+        format!("({apply_expr_base}) {{ attrPath = {attr_path_expr}; system = {system_expr}; }}")
     };
 
     Cmd::nix()
@@ -86,8 +85,13 @@ fn get_drv_path_flake(
         // It also causes Nix to report "SQLite database is busy" errors
         // when running multiple evaluations in parallel.
         .arg("--no-eval-cache")
-        .args(["--apply", "v: v.drvPath"])
-        .args(["--", &flake_ref])
+        .args(["--apply", &apply_expr])
+        .arg("--")
+        .arg(&if let Some(rev) = commit_id {
+            format!("{}?rev={}#.", flake_path.as_str(), rev)
+        } else {
+            format!("{}#.", flake_path.as_str())
+        })
         .output_json()
 }
 
@@ -153,6 +157,27 @@ fn to_string_literal(s: &str) -> impl fmt::Display {
             }
         }
         f.write_char('"')?;
+        Ok(())
+    })
+}
+
+fn to_string_list_literal(
+    elems: impl IntoIterator<Item = impl AsRef<str>> + Clone,
+) -> impl fmt::Display {
+    use std::fmt::Write;
+
+    fmt::from_fn(move |f| {
+        f.write_char('[')?;
+        let mut first = true;
+        for elem in elems.clone() {
+            if first {
+                first = false;
+            } else {
+                f.write_char(' ')?;
+            }
+            write!(f, "{}", to_string_literal(elem.as_ref()))?;
+        }
+        f.write_char(']')?;
         Ok(())
     })
 }

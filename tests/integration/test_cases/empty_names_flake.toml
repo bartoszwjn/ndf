@@ -1,10 +1,7 @@
 # Both CppNix (2.34.7) and Lix (2.95.2) technically allow empty attribute names in flake outputs,
 # but the attribute paths are sometimes parsed differently between implementations.
 [command]
-args = [
-  # '""', # `""` works fine with Lix, but CppNix treats it as an attr path with no components.
-  'foo."".bar',
-]
+args = ['""', 'foo."".bar']
 
 [repo_contents]
 
@@ -53,9 +50,13 @@ From:  @COMMIT_1_SHORT_ID@ commit 1
 To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
 Tool:  none
 Attribute paths:
+  ""
   foo."".bar
 
 Summary:
+  "" /nix/store/dxx3wb5c4wggz0dnirncm83qzhmsc3vg-empty.drv
+  == /nix/store/dxx3wb5c4wggz0dnirncm83qzhmsc3vg-empty.drv
+
   foo."".bar /nix/store/6kpmixa64q8ivx4zzm7z4fcjn021fpj2-foobar.drv
   ==         /nix/store/6kpmixa64q8ivx4zzm7z4fcjn021fpj2-foobar.drv
 """

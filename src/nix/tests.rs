@@ -30,3 +30,22 @@ fn to_string_literal() {
         );
     }
 }
+
+#[test]
+fn to_string_list_literal() {
+    let cases = [
+        ([].as_slice(), "[]"),
+        (&["a"], r#"["a"]"#),
+        (&["a", "b"], r#"["a" "b"]"#),
+        (&["a", "b", "c"], r#"["a" "b" "c"]"#),
+    ];
+
+    for case in cases {
+        let result = super::to_string_list_literal(case.0).to_string();
+        assert_eq!(
+            result, case.1,
+            "{:?}: unexpected result of to_list_literal",
+            case.0
+        );
+    }
+}

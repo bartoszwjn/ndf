@@ -56,6 +56,14 @@ impl AttrPath {
         );
     }
 
+    pub(crate) fn has_leading_dot(&self) -> bool {
+        self.leading_dot
+    }
+
+    pub(crate) fn as_parts(&self) -> &[String] {
+        &self.parts
+    }
+
     pub(crate) fn to_parts_json(&self) -> String {
         let parts: &[String] = &self.parts;
         serde_json::to_string(parts)
@@ -67,7 +75,8 @@ impl AttrPath {
     /// This can be used with the `-A`/`--attr` option of old-style Nix commands (e.g. `nix-build`),
     /// or the new-style Nix commands (e.g. `nix build`) as the installable argument
     /// when using either `--file` or `--expr` options.
-    pub(crate) fn to_cli_arg(&self) -> eyre::Result<impl fmt::Display> {
+    #[allow(dead_code)] // TODO: remove
+    fn to_cli_arg(&self) -> eyre::Result<impl fmt::Display> {
         if self.parts.iter().any(|part| part.contains('"')) {
             eyre::bail!(
                 "attribute paths containing '\"' cannot be passed to Nix on the command line"
@@ -98,7 +107,8 @@ impl AttrPath {
     }
 
     /// Display the attr path in a from suitable for using as part of a flake reference.
-    pub(crate) fn to_flake_fragment(&self) -> eyre::Result<impl fmt::Display> {
+    #[allow(dead_code)] // TODO: remove
+    fn to_flake_fragment(&self) -> eyre::Result<impl fmt::Display> {
         use std::fmt::Write;
 
         // https://url.spec.whatwg.org/#fragment-percent-encode-set
