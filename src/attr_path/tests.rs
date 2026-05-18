@@ -58,20 +58,16 @@ fn cli_arg_roundtrip() -> eyre::Result<()> {
     for case in cases {
         let parsed = AttrPath::parse_cli_arg(case.0)?;
         assert_eq!(
-            parsed,
-            case.1,
-            "{:?}: unexpected result of {}",
+            parsed, case.1,
+            "{:?}: unexpected result of AttrPath::parse_cli_arg",
             case.0,
-            stringify!(AttrPath::parse_cli_arg),
         );
 
         let unparsed = parsed.to_cli_arg()?.to_string();
         assert_eq!(
-            unparsed,
-            case.2,
-            "{:?}: unexpected result of {}",
+            unparsed, case.2,
+            "{:?}: unexpected result of AttrPath::to_cli_arg",
             case.0,
-            stringify!(AttrPath::to_cli_arg),
         );
     }
     Ok(())
@@ -96,9 +92,8 @@ fn parse_cli_arg_errors() {
         assert_eq!(
             result,
             Err(case.1),
-            "{:?}: unexpected result of {}",
+            "{:?}: unexpected result of AttrPath::parse_cli_arg",
             case.0,
-            stringify!(AttrPath::parse_cli_arg),
         );
     }
 }
@@ -130,12 +125,9 @@ fn display_width() -> eyre::Result<()> {
             let actual_width = UnicodeWidthStr::width(output.as_str());
 
             assert_eq!(
-                expected_width,
-                actual_width,
-                "{:?}: {} output doesn't match the actual width of {}",
-                case,
-                stringify!(AttrPath::display_width),
-                stringify!(AttrPath::display),
+                expected_width, actual_width,
+                "{case:?}: AttrPath::display_width output doesn't match \
+                    the actual width of AttrPath::display",
             );
         }
     }
@@ -172,11 +164,9 @@ fn display() {
     for case in cases {
         let output = case.0.display().to_string();
         assert_eq!(
-            output,
-            case.1,
-            "{:?} unexpected result of {}",
+            output, case.1,
+            "{:?} unexpected result of AttrPath::display",
             case.0,
-            stringify!(AttrPath::display),
         );
     }
 }
