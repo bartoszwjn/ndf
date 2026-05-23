@@ -5,48 +5,46 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{AttrPath, ParseError};
 
-fn mk<const N: usize>(leading_dot: bool, parts: [&str; N]) -> AttrPath {
-    AttrPath {
+fn mk(leading_dot: bool, parts: &[&str], nixos: bool) -> AttrPath {
+    AttrPath::new(
         leading_dot,
-        parts: parts.into_iter().map(Into::into).collect(),
-    }
+        parts.iter().map(|&s| String::from(s)).collect(),
+        nixos,
+    )
 }
 
 #[test]
 fn parse_cli_arg() -> eyre::Result<()> {
-    let cases = [
+    let cases: [(&str, (bool, &[&str])); _] = [
         // simple
-        ("a", mk(false, ["a"])),
-        ("foo.bar.baz", mk(false, ["foo", "bar", "baz"])),
+        ("a", (false, &["a"])),
+        ("foo.bar.baz", (false, &["foo", "bar", "baz"])),
         // leading dot
-        (".", mk(true, [])),
-        (".foo", mk(true, ["foo"])),
-        (".foo.bar", mk(true, ["foo", "bar"])),
+        (".", (true, &[])),
+        (".foo", (true, &["foo"])),
+        (".foo.bar", (true, &["foo", "bar"])),
         // quoting
-        ("\"foo\"", mk(false, ["foo"])),
-        ("f\"o\"o", mk(false, ["foo"])),
-        ("\".foo\"", mk(false, [".foo"])),
-        ("\"foo.bar.baz\"", mk(false, ["foo.bar.baz"])),
-        (
-            "foo.\"bar.baz\".quux",
-            mk(false, ["foo", "bar.baz", "quux"]),
-        ),
+        ("\"foo\"", (false, &["foo"])),
+        ("f\"o\"o", (false, &["foo"])),
+        ("\".foo\"", (false, &[".foo"])),
+        ("\"foo.bar.baz\"", (false, &["foo.bar.baz"])),
+        ("foo.\"bar.baz\".quux", (false, &["foo", "bar.baz", "quux"])),
         (
             "foo.\"bar.baz\".quux.\"\".more\".\"dots",
-            mk(false, ["foo", "bar.baz", "quux", "", "more.dots"]),
+            (false, &["foo", "bar.baz", "quux", "", "more.dots"]),
         ),
         // empty
-        ("", mk(false, [])),
-        ("\"\"", mk(false, [""])),
-        (".\"\".foo.\"\".bar", mk(true, ["", "foo", "", "bar"])),
+        ("", (false, &[])),
+        ("\"\"", (false, &[""])),
+        (".\"\".foo.\"\".bar", (true, &["", "foo", "", "bar"])),
     ];
 
-    for case in cases {
-        let parsed = AttrPath::parse_cli_arg(case.0)?;
+    for (input, expected) in cases {
+        let parsed = AttrPath::parse_cli_arg(input)?;
+        let expected = mk(expected.0, expected.1, false);
         assert_eq!(
-            parsed, case.1,
-            "{:?}: unexpected result of AttrPath::parse_cli_arg",
-            case.0,
+            expected, parsed,
+            "{input:?}: unexpected result of AttrPath::parse_cli_arg",
         );
     }
     Ok(())
@@ -91,23 +89,22 @@ fn display_width() -> eyre::Result<()> {
 
     for parts in cases {
         for leading_dot in [false, true] {
-            let case = AttrPath {
-                leading_dot,
-                parts: parts.iter().copied().map(Into::into).collect(),
-            };
+            for nixos in [false, true] {
+                let case = mk(leading_dot, parts, nixos);
 
-            let expected_width = case.display_width();
+                let expected_width = case.display_width();
 
-            let mut stream = StripStream::new(Vec::new());
-            write!(stream, "{}", case.display())?;
-            let output = String::from_utf8(stream.into_inner())?;
-            let actual_width = UnicodeWidthStr::width(output.as_str());
+                let mut stream = StripStream::new(Vec::new());
+                write!(stream, "{}", case.display())?;
+                let output = String::from_utf8(stream.into_inner())?;
+                let actual_width = UnicodeWidthStr::width(output.as_str());
 
-            assert_eq!(
-                expected_width, actual_width,
-                "{case:?}: AttrPath::display_width output doesn't match \
+                assert_eq!(
+                    expected_width, actual_width,
+                    "{case:?}: AttrPath::display_width output doesn't match \
                     the actual width of AttrPath::display",
-            );
+                );
+            }
         }
     }
     Ok(())
@@ -115,37 +112,53 @@ fn display_width() -> eyre::Result<()> {
 
 #[test]
 fn display() {
-    use crate::styles::{ATTR_PATH as A, ATTR_PATH_QUOTED as Q};
-    let cases = [
-        (mk(false, []), format!("{Q}(empty){Q:#}")),
-        (mk(true, []), format!("{A}.{A:#}")),
-        (mk(false, ["foo"]), format!("{A}foo{A:#}")),
-        (mk(true, ["foo"]), format!("{A}.{A:#}{A}foo{A:#}")),
+    use crate::styles::{ATTR_PATH as A, ATTR_PATH_NIXOS as N, ATTR_PATH_QUOTED as Q};
+
+    type Input<'a> = (bool, &'a [&'a str], bool);
+    let cases: [(Input<'_>, String); _] = [
+        ((false, &[], false), format!("{Q}(empty){Q:#}")),
+        ((true, &[], false), format!("{A}.{A:#}")),
+        ((false, &["foo"], false), format!("{A}foo{A:#}")),
+        ((true, &["foo"], false), format!("{A}.{A:#}{A}foo{A:#}")),
         (
-            mk(false, ["foo", "bar", "baz"]),
+            (false, &["foo", "bar", "baz"], false),
             format!("{A}foo{A:#}{A}.{A:#}{A}bar{A:#}{A}.{A:#}{A}baz{A:#}"),
         ),
         (
-            mk(true, ["foo", "bar", "baz"]),
+            (true, &["foo", "bar", "baz"], false),
             format!("{A}.{A:#}{A}foo{A:#}{A}.{A:#}{A}bar{A:#}{A}.{A:#}{A}baz{A:#}"),
         ),
-        (mk(false, ["foo bar"]), format!("{Q}\"foo bar\"{Q:#}")),
+        ((false, &["foo bar"], false), format!("{Q}\"foo bar\"{Q:#}")),
         (
-            mk(true, ["foo bar"]),
+            (true, &["foo bar"], false),
             format!("{A}.{A:#}{Q}\"foo bar\"{Q:#}"),
         ),
         (
-            mk(false, ["foo.bar", "baz", "qu\"ux"]),
+            (false, &["foo.bar", "baz", "qu\"ux"], false),
             format!("{Q}\"foo.bar\"{Q:#}{A}.{A:#}{A}baz{A:#}{A}.{A:#}{Q}\"qu\"ux\"{Q:#}"),
+        ),
+        // NixOS
+        (
+            (false, &[], true),
+            format!("{Q}(empty){Q:#} {N}(NixOS){N:#}"),
+        ),
+        ((true, &[], true), format!("{A}.{A:#} {N}(NixOS){N:#}")),
+        (
+            (false, &["foo"], true),
+            format!("{A}foo{A:#} {N}(NixOS){N:#}"),
+        ),
+        (
+            (true, &["foo"], true),
+            format!("{A}.{A:#}{A}foo{A:#} {N}(NixOS){N:#}"),
         ),
     ];
 
-    for case in cases {
-        let output = case.0.display().to_string();
+    for (input, expected) in cases {
+        let input = mk(input.0, input.1, input.2);
+        let output = input.display().to_string();
         assert_eq!(
-            output, case.1,
-            "{:?} unexpected result of AttrPath::display",
-            case.0,
+            expected, output,
+            "{input:?} unexpected result of AttrPath::display",
         );
     }
 }

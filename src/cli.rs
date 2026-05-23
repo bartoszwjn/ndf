@@ -191,13 +191,7 @@ impl NdfApp {
             get_default_attr_names(&source, self.nixos)
                 .wrap_err("failed to determine default attribute paths")?
                 .into_iter()
-                .map(|name| {
-                    if self.nixos {
-                        AttrPath::from_parts_nixos(vec![name], &source)
-                    } else {
-                        AttrPath::from_parts(vec![name])
-                    }
-                })
+                .map(|name| AttrPath::new(false, vec![name], self.nixos))
                 .collect()
         } else {
             self.attr_paths

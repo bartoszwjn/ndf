@@ -1,10 +1,13 @@
 [command]
 args = [
   "--nixos",
-  "groups.g1.nixos1",
-  "groups.g1.nixos2",
-  "groups.g2.nixos3",
-  ".g4.nixos4",
+  "group1.nixos1",
+  "group1.nixos2",
+  "group2.nixos3",
+  "group3.nixos4",  # no leading dot -> nixosConfigurations over root
+  ".group3.nixos4", # leading dot -> root over nixosConfigurations
+  "group4.nixos5",  # no leading dot -> not searching in root at all
+  ".group1.nixos1", # leading dot -> not searching in nixosConfigurations at all
 ]
 
 [repo_contents]
@@ -21,11 +24,13 @@ files."flake.nix" = """
     in
     {
       nixosConfigurations = {
-        groups.g1.nixos1 = nixos "nixos1-1";
-        groups.g1.nixos2 = nixos "nixos2";
-        groups.g2.nixos3 = nixos "nixos3";
+        group1.nixos1 = nixos "nixos1-1";
+        group1.nixos2 = nixos "nixos2";
+        group2.nixos3 = nixos "nixos3";
+        group3.nixos4 = nixos "nixos4-cfgs";
       };
-      g4.nixos4 = nixos "nixos4";
+      group3.nixos4 = nixos "nixos4-root";
+      group4.nixos5 = nixos "nixos5";
     };
 }
 """
@@ -42,17 +47,19 @@ files."flake.nix" = """
     in
     {
       nixosConfigurations = {
-        groups.g1.nixos1 = nixos "nixos1-2";
-        groups.g1.nixos2 = nixos "nixos2";
-        groups.g2.nixos3 = nixos "nixos3";
+        group1.nixos1 = nixos "nixos1-2";
+        group1.nixos2 = nixos "nixos2";
+        group2.nixos3 = nixos "nixos3";
+        group3.nixos4 = nixos "nixos4-cfgs";
       };
-      g4.nixos4 = nixos "nixos4";
+      group3.nixos4 = nixos "nixos4-root";
+      group4.nixos5 = nixos "nixos5";
     };
 }
 """
 
 [outputs]
-exit_code = 1
+exit_code = 2
 stdout = """
 Flake: @REPO@
 Repo:  @REPO@
@@ -60,22 +67,34 @@ From:  @COMMIT_1_SHORT_ID@ commit 1
 To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
 Tool:  none
 Attribute paths:
-  .nixosConfigurations.groups.g1.nixos1.config.system.build.toplevel
-  .nixosConfigurations.groups.g1.nixos2.config.system.build.toplevel
-  .nixosConfigurations.groups.g2.nixos3.config.system.build.toplevel
-  .g4.nixos4.config.system.build.toplevel
+  group1.nixos1 (NixOS)
+  group1.nixos2 (NixOS)
+  group2.nixos3 (NixOS)
+  group3.nixos4 (NixOS)
+  .group3.nixos4 (NixOS)
+  group4.nixos5 (NixOS)
+  .group1.nixos1 (NixOS)
 
 Summary:
-  .nixosConfigurations.groups.g1.nixos1.config.system.build.toplevel /nix/store/j54xzm2nfh4ighlbdll5fqxmnjch1d0h-nixos1-1.drv
-  !=                                                                 /nix/store/v7lw095ayml3r8z6ggwld1h1hqc1h680-nixos1-2.drv
+  group1.nixos1 (NixOS) /nix/store/j54xzm2nfh4ighlbdll5fqxmnjch1d0h-nixos1-1.drv
+  !=                    /nix/store/v7lw095ayml3r8z6ggwld1h1hqc1h680-nixos1-2.drv
 
-  .nixosConfigurations.groups.g1.nixos2.config.system.build.toplevel /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
-  ==                                                                 /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
+  group1.nixos2 (NixOS) /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
+  ==                    /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
 
-  .nixosConfigurations.groups.g2.nixos3.config.system.build.toplevel /nix/store/psmhx5p3azp6j0dw7ygzs2nshgwgwxs3-nixos3.drv
-  ==                                                                 /nix/store/psmhx5p3azp6j0dw7ygzs2nshgwgwxs3-nixos3.drv
+  group2.nixos3 (NixOS) /nix/store/psmhx5p3azp6j0dw7ygzs2nshgwgwxs3-nixos3.drv
+  ==                    /nix/store/psmhx5p3azp6j0dw7ygzs2nshgwgwxs3-nixos3.drv
 
-  .g4.nixos4.config.system.build.toplevel /nix/store/6byklb1lhrcavp3ncvcjs7lvmfpc5rw5-nixos4.drv
-  ==                                      /nix/store/6byklb1lhrcavp3ncvcjs7lvmfpc5rw5-nixos4.drv
+  group3.nixos4 (NixOS) /nix/store/r5mhxif06kz6k96mlk965czzr6qysp33-nixos4-cfgs.drv
+  ==                    /nix/store/r5mhxif06kz6k96mlk965czzr6qysp33-nixos4-cfgs.drv
+
+  .group3.nixos4 (NixOS) /nix/store/11c4gqcgcnisgk0zky8vv3mwsmpqr5jm-nixos4-root.drv
+  ==                     /nix/store/11c4gqcgcnisgk0zky8vv3mwsmpqr5jm-nixos4-root.drv
+
+  group4.nixos5 (NixOS) missing
+  ??                    missing
+
+  .group1.nixos1 (NixOS) missing
+  ??                     missing
 """
 stderr = ""

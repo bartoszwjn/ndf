@@ -84,8 +84,9 @@ fn get_drv_path_flake(
     attr_path: &AttrPath,
 ) -> eyre::Result<GetDrvPathResult> {
     let apply_expr_base = include_str!("nix/get-drv-path-flake.nix");
-    let attr_path_expr = to_string_list_literal(attr_path.as_parts());
-    let apply_expr = if attr_path.has_leading_dot() {
+    let (has_leading_dot, attr_path_parts) = attr_path.flake_query();
+    let attr_path_expr = to_string_list_literal(&attr_path_parts);
+    let apply_expr = if has_leading_dot {
         format!("({apply_expr_base}) {{ attrPath = {attr_path_expr}; system = null; }}")
     } else {
         let current_system = get_current_system()?;
@@ -119,6 +120,8 @@ fn get_drv_path_file(
     let Ok(path_relative) = file_path.strip_prefix(repo_root) else {
         unreachable!("repo_root must be a prefix of file_path")
     };
+    let attr_path_json = serde_json::to_string::<Vec<&str>>(&attr_path.file_query())
+        .expect("serializing a list of strings into a String cannot fail");
 
     Cmd::nix_instantiate()
         .args(["--eval", "--strict", "--json", "--read-write-mode"])
@@ -132,7 +135,7 @@ fn get_drv_path_file(
         } else {
             ["--arg", "rev", "null"]
         })
-        .args(["--argstr", "attrPathJson", &attr_path.to_parts_json()])
+        .args(["--argstr", "attrPathJson", &attr_path_json])
         .output_json()
 }
 
@@ -176,21 +179,19 @@ fn to_string_literal(s: &str) -> impl fmt::Display {
     })
 }
 
-fn to_string_list_literal(
-    elems: impl IntoIterator<Item = impl AsRef<str>> + Clone,
-) -> impl fmt::Display {
+fn to_string_list_literal(elems: &[&str]) -> impl fmt::Display {
     use std::fmt::Write;
 
     fmt::from_fn(move |f| {
         f.write_char('[')?;
         let mut first = true;
-        for elem in elems.clone() {
+        for elem in elems {
             if first {
                 first = false;
             } else {
                 f.write_char(' ')?;
             }
-            write!(f, "{}", to_string_literal(elem.as_ref()))?;
+            write!(f, "{}", to_string_literal(elem))?;
         }
         f.write_char(']')?;
         Ok(())

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, iter};
 
 use crate::diff_spec::Source;
 
@@ -9,81 +9,76 @@ mod tests;
 pub(crate) struct AttrPath {
     parts: Vec<String>,
     leading_dot: bool,
+    nixos: bool,
 }
 
 impl AttrPath {
-    pub(crate) fn from_cli_arg(s: &str, source: &Source, nixos: bool) -> eyre::Result<Self> {
-        let mut this = Self::parse_cli_arg(s)?;
+    pub(crate) fn new(leading_dot: bool, parts: Vec<String>, nixos: bool) -> Self {
+        Self {
+            parts,
+            leading_dot,
+            nixos,
+        }
+    }
+
+    pub(crate) fn from_cli_arg(arg: &str, source: &Source, nixos: bool) -> eyre::Result<Self> {
+        let mut this = Self::parse_cli_arg(arg)?;
+        this.nixos = nixos;
 
         if this.leading_dot && matches!(source, Source::File(_)) {
             eyre::bail!("attribute paths with leading dots cannot be used together with '--file'")
         }
 
-        if nixos {
-            this.add_nixos_parts(source);
-        }
-
         Ok(this)
     }
 
-    pub(crate) fn from_parts(parts: Vec<String>) -> Self {
-        Self {
-            parts,
-            leading_dot: false,
-        }
+    pub(crate) fn file_query(&self) -> Vec<&str> {
+        self.base_query().collect()
     }
 
-    pub(crate) fn from_parts_nixos(parts: Vec<String>, source: &Source) -> Self {
-        let mut this = Self::from_parts(parts);
-        this.add_nixos_parts(source);
-        this
+    pub(crate) fn flake_query(&self) -> (bool, Vec<&str>) {
+        let leading_dot = self.leading_dot || self.nixos;
+        let query = if self.nixos && !self.leading_dot {
+            iter::chain(["nixosConfigurations"], self.base_query()).collect()
+        } else {
+            self.base_query().collect()
+        };
+        (leading_dot, query)
     }
 
-    fn add_nixos_parts(&mut self, source: &Source) {
-        match source {
-            Source::Flake(_) if !self.leading_dot => {
-                self.parts.insert(0, "nixosConfigurations".into());
-                self.leading_dot = true;
-            }
-            Source::Flake(_) | Source::File(_) => {}
-        }
-        self.parts.extend(
-            ["config", "system", "build", "toplevel"]
-                .into_iter()
-                .map(Into::into),
-        );
-    }
-
-    pub(crate) fn has_leading_dot(&self) -> bool {
-        self.leading_dot
-    }
-
-    pub(crate) fn as_parts(&self) -> &[String] {
-        &self.parts
-    }
-
-    pub(crate) fn to_parts_json(&self) -> String {
-        let parts: &[String] = &self.parts;
-        serde_json::to_string(parts)
-            .expect("serializing a list of strings into a String cannot fail")
+    fn base_query(&self) -> impl Iterator<Item = &str> {
+        let suffix = if self.nixos {
+            ["config", "system", "build", "toplevel"].as_slice()
+        } else {
+            &[]
+        };
+        iter::chain(
+            self.parts.iter().map(String::as_str),
+            suffix.iter().copied(),
+        )
     }
 
     pub(crate) fn display_width(&self) -> usize {
-        if !self.leading_dot && self.parts.is_empty() {
-            return "(empty)".len();
-        }
+        let parts_width = if !self.leading_dot && self.parts.is_empty() {
+            "(empty)".len()
+        } else {
+            let num_dots =
+                self.parts.len().saturating_sub(1) + if self.leading_dot { 1 } else { 0 };
+            let parts_widths = self.parts.iter().map(|part| {
+                unicode_width::UnicodeWidthStr::width(part.as_str())
+                    + if Self::part_needs_quotes(part) { 2 } else { 0 }
+            });
+            num_dots + parts_widths.sum::<usize>()
+        };
 
-        let num_dots = self.parts.len().saturating_sub(1) + if self.leading_dot { 1 } else { 0 };
-        let parts_widths = self.parts.iter().map(|part| {
-            unicode_width::UnicodeWidthStr::width(part.as_str())
-                + if Self::part_needs_quotes(part) { 2 } else { 0 }
-        });
-        num_dots + parts_widths.sum::<usize>()
+        let suffix_width = if self.nixos { " (NixOS)".len() } else { 0 };
+
+        parts_width + suffix_width
     }
 
     /// Pretty-print the attr path to the user.
     pub(crate) fn display(&self) -> impl fmt::Display {
-        use crate::styles::{ATTR_PATH, ATTR_PATH_QUOTED};
+        use crate::styles::{ATTR_PATH, ATTR_PATH_NIXOS, ATTR_PATH_QUOTED};
 
         fmt::from_fn(|f| {
             if self.leading_dot {
@@ -106,6 +101,11 @@ impl AttrPath {
                     write!(f, "{ATTR_PATH}{part}{ATTR_PATH:#}")?;
                 }
             }
+
+            if self.nixos {
+                write!(f, " {ATTR_PATH_NIXOS}(NixOS){ATTR_PATH_NIXOS:#}")?;
+            }
+
             Ok(())
         })
     }
@@ -126,7 +126,7 @@ impl AttrPath {
 
         if s.is_empty() {
             let parts = Vec::new();
-            return Ok(Self { leading_dot, parts });
+            return Ok(Self::new(leading_dot, parts, false));
         }
 
         let mut parts = Vec::new();
@@ -165,7 +165,7 @@ impl AttrPath {
             return Err(ParseError::TrailingDot);
         }
 
-        Ok(Self { leading_dot, parts })
+        Ok(Self::new(leading_dot, parts, false))
     }
 }
 
@@ -173,7 +173,10 @@ impl fmt::Debug for AttrPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.leading_dot {
             write!(f, ".")?;
+        } else if self.parts.is_empty() {
+            write!(f, "(empty)")?;
         }
+
         let mut first = true;
         for part in &self.parts {
             if first {
@@ -183,6 +186,11 @@ impl fmt::Debug for AttrPath {
                 write!(f, ".{part:?}")?;
             }
         }
+
+        if self.nixos {
+            write!(f, " (NixOS)")?;
+        }
+
         Ok(())
     }
 }
