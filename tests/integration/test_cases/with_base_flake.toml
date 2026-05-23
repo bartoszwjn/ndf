@@ -1,0 +1,49 @@
+[command]
+args = ["--base", "base"]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        base = drv "base";
+        one = drv "one";
+        other = drv "other";
+      };
+    };
+}
+"""
+
+[outputs]
+exit_code = 1
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+Tool:  none
+Base:  base
+Attribute paths:
+  base
+  one
+  other
+
+Summary:
+     base /nix/store/47p9g28wzzc0ncnbdpwgqmcmh9nknx9g-base.drv
+  == base /nix/store/47p9g28wzzc0ncnbdpwgqmcmh9nknx9g-base.drv
+
+     base /nix/store/47p9g28wzzc0ncnbdpwgqmcmh9nknx9g-base.drv
+  != one  /nix/store/4j3wi6w05px0nh7qc3ds6nhq9wfqmnwz-one.drv
+
+     base  /nix/store/47p9g28wzzc0ncnbdpwgqmcmh9nknx9g-base.drv
+  != other /nix/store/jgc40b3aj7cgrai4cka7w5ry5z3bdfk3-other.drv
+"""
+stderr = ""

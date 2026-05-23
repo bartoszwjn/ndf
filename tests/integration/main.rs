@@ -59,5 +59,7 @@ test_cases!(
     subdir_flake,
     weird_names_file,
     weird_names_flake,
+    with_base_file,
+    with_base_flake,
     // keep-sorted end
 );
