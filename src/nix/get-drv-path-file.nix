@@ -5,73 +5,52 @@
   attrPathJson,
 }:
 let
-  inherit (builtins)
-    attrNames
-    concatStringsSep
-    elemAt
-    fetchGit
-    fromJSON
-    genList
-    isAttrs
-    isFunction
-    length
-    typeOf
-    ;
+  getAttrByPath =
+    attrPath: set:
+    let
+      numAttrs = builtins.length attrPath;
+      getAttrByPath' =
+        n: v:
+        let
+          attr = builtins.elemAt attrPath n;
+        in
+        if n == numAttrs then
+          { ok = v; }
+        else if v ? ${attr} then
+          getAttrByPath' (n + 1) v.${attr}
+        else
+          "missing";
+    in
+    getAttrByPath' 0 set;
 
-  autoApply = x: if isFunction x then x { } else x;
+  getDrvPath =
+    v: if (v.type or null) == "derivation" then { ok = v.drvPath; } else { unexpectedType = typeOf v; };
 
-  repoPath = /. + repoRoot;
+  typeOf =
+    v:
+    builtins.typeOf v
+    + (
+      if builtins.isString (v.type or null) then
+        " (with type = ${v.type})"
+      else if builtins.isString (v._type or null) then
+        " (with _type = ${v._type})"
+      else
+        ""
+    );
+
+  autoApply = x: if builtins.isFunction x then x { } else x;
+
   repo =
     if rev == null then
-      repoPath
+      repoRoot
     else
-      fetchGit {
-        url = repoPath;
+      builtins.fetchGit {
+        url = /. + repoRoot;
         inherit rev;
       };
   path = if pathInRepo == "" then repo else repo + "/${pathInRepo}";
 
-  getDrvByPath =
-    attrPath: set:
-    let
-      numAttrs = length attrPath;
-      showPath = concatStringsSep ".";
-      sublist = len: list: genList (n: elemAt list n) len;
-
-      notFound =
-        n: context:
-        throw (
-          "attribute '${elemAt attrPath n}' in selection path '${showPath attrPath}' not found"
-          + " inside path '${showPath (sublist n attrPath)}', "
-          + context
-        );
-
-      showNames =
-        set:
-        let
-          names = attrNames set;
-          numNames = length names;
-          maxShown = 10;
-          numShown = if maxShown < numNames then maxShown else numNames;
-          numNotShown = numNames - numShown;
-        in
-        concatStringsSep ", " (sublist numShown names)
-        + (if 0 < numNotShown then " and ${toString numNotShown} more" else "");
-
-      getDrvByPath' =
-        n: v:
-        let
-          attr = elemAt attrPath n;
-        in
-        if n == numAttrs then
-          v.drvPath
-        else if !(isAttrs v) then
-          notFound n "which is not an attribute set, but a ${typeOf v}"
-        else if !(v ? ${attr}) then
-          notFound n "which contains names ${showNames v}"
-        else
-          getDrvByPath' (n + 1) v.${attr};
-    in
-    getDrvByPath' 0 set;
+  evalRoot = autoApply (import path);
+  selected = getAttrByPath (builtins.fromJSON attrPathJson) evalRoot;
 in
-getDrvByPath (fromJSON attrPathJson) (autoApply (import path))
+if selected ? ok then getDrvPath selected.ok else selected

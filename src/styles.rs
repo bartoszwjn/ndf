@@ -14,6 +14,7 @@ pub(crate) const NOT_EQUAL: Style = AnsiColor::Red.on_default();
 pub(crate) const UNKNOWN: Style = AnsiColor::BrightBlack.on_default();
 
 pub(crate) const EVAL_SUCCESS: Style = Style::new();
+pub(crate) const EVAL_MISSING: Style = AnsiColor::Yellow.on_default();
 pub(crate) const EVAL_ERROR: Style = AnsiColor::Red.on_default();
 
 pub(crate) const FROM: Style = AnsiColor::Red.on_default().bold();

@@ -47,7 +47,7 @@ struct GitIndex {
 #[derive(Debug, serde::Deserialize)]
 struct Outputs {
     exit_code: i32,
-    stdout: Option<String>,
+    stdout: String,
     stderr: Option<String>,
 }
 
@@ -196,14 +196,12 @@ impl Outputs {
             .section(stderr.to_owned().header("Captured stderr:")));
         }
 
-        if let Some(expected) = &self.stdout {
-            let expected: &str = &substitute_string(expected, substitutions);
-            pretty_assertions::assert_eq!(expected, stdout, "unexpected stdout");
-        }
+        let expected_stdout: &str = &substitute_string(&self.stdout, substitutions);
+        pretty_assertions::assert_eq!(expected_stdout, stdout, "unexpected stdout");
 
-        if let Some(expected) = &self.stderr {
-            let expected: &str = &substitute_string(expected, substitutions);
-            pretty_assertions::assert_eq!(expected, stderr, "unexpected stderr")
+        if let Some(expected_stderr) = &self.stderr {
+            let expected_stderr: &str = &substitute_string(expected_stderr, substitutions);
+            pretty_assertions::assert_eq!(expected_stderr, stderr, "unexpected stderr")
         }
 
         Ok(())
@@ -230,20 +228,18 @@ impl Outputs {
             updated = true;
         }
 
-        if let Some(expected) = &self.stdout {
-            let expected = substitute_string(expected, substitutions);
-            let stdout = str::from_utf8(&output.stdout).unwrap();
-            if stdout != expected {
-                let value = output_config.get_mut("stdout").unwrap();
-                *value = reverse_substitutions(stdout, substitutions).into();
-                updated = true;
-            }
+        let expected_stdout = substitute_string(&self.stdout, substitutions);
+        let stdout = str::from_utf8(&output.stdout).unwrap();
+        if stdout != expected_stdout {
+            let value = output_config.get_mut("stdout").unwrap();
+            *value = reverse_substitutions(stdout, substitutions).into();
+            updated = true;
         }
 
-        if let Some(expected) = &self.stderr {
-            let expected = substitute_string(expected, substitutions);
+        if let Some(expected_stderr) = &self.stderr {
+            let expected_stderr = substitute_string(expected_stderr, substitutions);
             let stderr = str::from_utf8(&output.stderr).unwrap();
-            if stderr != expected {
+            if stderr != expected_stderr {
                 let value = output_config.get_mut("stderr").unwrap();
                 *value = reverse_substitutions(stderr, substitutions).into();
                 updated = true;

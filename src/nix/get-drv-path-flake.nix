@@ -1,51 +1,56 @@
 { attrPath, system }:
 flake:
 let
-  inherit (builtins)
-    concatStringsSep
-    elemAt
-    isAttrs
-    length
-    ;
-
   getAttrByPath =
-    path: set:
+    attrPath: set:
     let
-      numAttrs = length path;
+      numAttrs = builtins.length attrPath;
       getAttrByPath' =
         n: v:
         let
-          attr = elemAt path n;
+          attr = builtins.elemAt attrPath n;
         in
         if n == numAttrs then
-          { found = v; }
-        else if isAttrs v && v ? ${attr} then
+          { ok = v; }
+        else if v ? ${attr} then
           getAttrByPath' (n + 1) v.${attr}
         else
-          { };
+          "missing";
     in
     getAttrByPath' 0 set;
 
-  inPackages = getAttrByPath attrPath flake.packages.${system};
-  inLegacyPackages = getAttrByPath attrPath flake.legacyPackages.${system};
-  inRoot = getAttrByPath attrPath flake;
+  getDrvPath =
+    v: if (v.type or null) == "derivation" then { ok = v.drvPath; } else { unexpectedType = typeOf v; };
 
-  showPath = concatStringsSep "." attrPath;
-  notFound = throw (
-    "flake does not provide attribute "
+  typeOf =
+    v:
+    builtins.typeOf v
     + (
-      if system == null then
-        "'${showPath}'"
+      if builtins.isString (v.type or null) then
+        " (with type = ${v.type})"
+      else if builtins.isString (v._type or null) then
+        " (with _type = ${v._type})"
       else
-        "'packages.${system}.${showPath}', 'legacyPackages.${system}.${showPath}' or '${showPath}'"
-    )
-  );
+        ""
+    );
+
+  inPackages =
+    if system != null && flake ? packages.${system} then
+      getAttrByPath attrPath flake.packages.${system}
+    else
+      "missing";
+  inLegacyPackages =
+    if system != null && flake ? legacyPackages.${system} then
+      getAttrByPath attrPath flake.legacyPackages.${system}
+    else
+      "missing";
+  inRoot = getAttrByPath attrPath flake;
 in
-if system != null && flake ? packages.${system} && inPackages ? found then
-  inPackages.found.drvPath
-else if system != null && flake ? legacyPackages.${system} && inLegacyPackages ? found then
-  inLegacyPackages.found.drvPath
-else if inRoot ? found then
-  inRoot.found.drvPath
+if inPackages ? ok then
+  getDrvPath inPackages.ok
+else if inLegacyPackages ? ok then
+  getDrvPath inLegacyPackages.ok
+else if inRoot ? ok then
+  getDrvPath inRoot.ok
 else
-  notFound
+  "missing"

@@ -16,6 +16,7 @@ pub(crate) struct SummaryItem {
 #[derive(Clone, Debug)]
 pub(crate) enum EvalResult {
     DrvPath(String),
+    Missing,
     Error,
 }
 
@@ -31,6 +32,10 @@ impl EvalResult {
         match (self, other) {
             (Self::DrvPath(old), Self::DrvPath(new)) if old == new => EvalResultCmp::Equal,
             (Self::DrvPath(_), Self::DrvPath(_)) => EvalResultCmp::NotEqual,
+            (Self::Missing, Self::DrvPath(_)) | (Self::DrvPath(_), Self::Missing) => {
+                EvalResultCmp::NotEqual
+            }
+            (Self::Missing, Self::Missing) => EvalResultCmp::Unknown,
             (Self::Error, _) | (_, Self::Error) => EvalResultCmp::Unknown,
         }
     }
@@ -102,10 +107,11 @@ impl fmt::Display for SummaryItem {
 
 impl fmt::Display for EvalResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use crate::styles::{EVAL_ERROR, EVAL_SUCCESS};
+        use crate::styles::{EVAL_ERROR, EVAL_MISSING, EVAL_SUCCESS};
         match self {
-            EvalResult::DrvPath(drv_path) => write!(f, "{EVAL_SUCCESS}{drv_path}{EVAL_SUCCESS:#}"),
-            EvalResult::Error => write!(f, "{EVAL_ERROR}error{EVAL_ERROR:#}"),
+            Self::DrvPath(drv_path) => write!(f, "{EVAL_SUCCESS}{drv_path}{EVAL_SUCCESS:#}"),
+            Self::Missing => write!(f, "{EVAL_MISSING}missing{EVAL_MISSING:#}"),
+            Self::Error => write!(f, "{EVAL_ERROR}error{EVAL_ERROR:#}"),
         }
     }
 }

@@ -28,7 +28,7 @@ in
 """
 
 [outputs]
-exit_code = 2
+exit_code = 1
 stdout = """
 File:  @REPO@/default.nix
 Repo:  @REPO@
@@ -43,6 +43,7 @@ Summary:
   pkg1 /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv
   !=   /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv
 
-  pkg3 error
-  ??   /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
+  pkg3 missing
+  !=   /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
 """
+stderr = ""

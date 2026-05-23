@@ -56,18 +56,33 @@ pub(crate) fn get_drv_path(
     source: &Source,
     commit_id: Option<&str>,
     attr_path: &AttrPath,
-) -> eyre::Result<String> {
-    match source {
-        Source::Flake(flake_path) => get_drv_path_flake(flake_path, commit_id, attr_path),
-        Source::File(file_path) => get_drv_path_file(repo_root, file_path, commit_id, attr_path),
+) -> eyre::Result<Option<String>> {
+    let result = match source {
+        Source::Flake(flake_path) => get_drv_path_flake(flake_path, commit_id, attr_path)?,
+        Source::File(file_path) => get_drv_path_file(repo_root, file_path, commit_id, attr_path)?,
+    };
+    match result {
+        GetDrvPathResult::Ok(drv_path) => Ok(Some(drv_path)),
+        GetDrvPathResult::Missing => Ok(None),
+        GetDrvPathResult::UnexpectedType(actual_type) => {
+            Err(eyre::eyre!("expected a derivation, got {actual_type}"))
+        }
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum GetDrvPathResult {
+    Ok(String),
+    Missing,
+    UnexpectedType(String),
 }
 
 fn get_drv_path_flake(
     flake_path: &FlakePath,
     commit_id: Option<&str>,
     attr_path: &AttrPath,
-) -> eyre::Result<String> {
+) -> eyre::Result<GetDrvPathResult> {
     let apply_expr_base = include_str!("nix/get-drv-path-flake.nix");
     let attr_path_expr = to_string_list_literal(attr_path.as_parts());
     let apply_expr = if attr_path.has_leading_dot() {
@@ -100,7 +115,7 @@ fn get_drv_path_file(
     file_path: &Path,
     commit_id: Option<&str>,
     attr_path: &AttrPath,
-) -> eyre::Result<String> {
+) -> eyre::Result<GetDrvPathResult> {
     let Ok(path_relative) = file_path.strip_prefix(repo_root) else {
         unreachable!("repo_root must be a prefix of file_path")
     };

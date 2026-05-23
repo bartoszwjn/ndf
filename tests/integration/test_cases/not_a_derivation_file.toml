@@ -1,0 +1,60 @@
+[command]
+args = ["--to=@", "-j1", "--file", "."] # `-j1` for deterministic order of logs
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."default.nix" = """
+{
+  string = "";
+  set = { };
+  set-with-type = { type = "configuration"; };
+  set-with-_type = { _type = "fileset"; };
+  set-with-types = { type = "primary"; _type = "secondary"; };
+}
+"""
+
+[outputs]
+exit_code = 2
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+Tool:  none
+Attribute paths:
+  set
+  set-with-_type
+  set-with-type
+  set-with-types
+  string
+
+Summary:
+  set error
+  ??  error
+
+  set-with-_type error
+  ??             error
+
+  set-with-type error
+  ??            error
+
+  set-with-types error
+  ??             error
+
+  string error
+  ??     error
+"""
+stderr = """
+ERROR eval_drv_path{attr_path="set" commit_id="@COMMIT_1_ID@"}: 
+   0: expected a derivation, got set
+ERROR eval_drv_path{attr_path="set-with-_type" commit_id="@COMMIT_1_ID@"}: 
+   0: expected a derivation, got set (with _type = fileset)
+ERROR eval_drv_path{attr_path="set-with-type" commit_id="@COMMIT_1_ID@"}: 
+   0: expected a derivation, got set (with type = configuration)
+ERROR eval_drv_path{attr_path="set-with-types" commit_id="@COMMIT_1_ID@"}: 
+   0: expected a derivation, got set (with type = primary)
+ERROR eval_drv_path{attr_path="string" commit_id="@COMMIT_1_ID@"}: 
+   0: expected a derivation, got string
+"""

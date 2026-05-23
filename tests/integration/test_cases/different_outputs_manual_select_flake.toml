@@ -1,5 +1,5 @@
 [command]
-args = []
+args = ["pkg1", "pkg2", "pkg3", "pkg4"]
 
 [repo_contents]
 
@@ -49,12 +49,21 @@ To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
 Tool:  none
 Attribute paths:
   pkg1
+  pkg2
   pkg3
+  pkg4
 
 Summary:
   pkg1 /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv
   !=   /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv
 
-  pkg3 error
-  ??   /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
+  pkg2 /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+  !=   missing
+
+  pkg3 missing
+  !=   /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
+
+  pkg4 missing
+  ??   missing
 """
+stderr = ""
