@@ -18,9 +18,6 @@ impl AttrPath {
         if this.leading_dot && matches!(source, Source::File(_)) {
             eyre::bail!("attribute paths with leading dots cannot be used together with '--file'")
         }
-        if this.leading_dot && nixos {
-            eyre::bail!("attribute paths with leading dots cannot be used together with '--nixos'")
-        }
 
         if nixos {
             this.add_nixos_parts(source);
@@ -44,8 +41,11 @@ impl AttrPath {
 
     fn add_nixos_parts(&mut self, source: &Source) {
         match source {
-            Source::Flake(_) => self.parts.insert(0, "nixosConfigurations".into()),
-            Source::File(_) => {}
+            Source::Flake(_) if !self.leading_dot => {
+                self.parts.insert(0, "nixosConfigurations".into());
+                self.leading_dot = true;
+            }
+            Source::Flake(_) | Source::File(_) => {}
         }
         self.parts.extend(
             ["config", "system", "build", "toplevel"]

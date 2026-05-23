@@ -30,7 +30,7 @@ pub struct NdfApp {
     ///
     /// By default, these paths are interpreted as flake output attributes
     /// of the flake in the current working directory.
-    #[arg()]
+    #[arg(value_name = "ATTR_PATH")]
     attr_paths: Vec<String>,
 
     /// Report changes from this revision.
@@ -71,9 +71,11 @@ pub struct NdfApp {
 
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
-    /// Each `<ATTR_PATH>` will be transformed to:
-    /// - `<ATTR_PATH>.config.system.build.toplevel` if `--file` was used,
-    /// - `nixosConfigurations.<ATTR_PATH>.config.system.build.toplevel` for flake outputs.
+    /// When this flag is present:
+    /// - Each `<ATTR_PATH>` is treated as if `.config.system.build.toplevel` was appended to it.
+    /// - Flake output attribute paths without a leading dot are interpreted as relative to
+    ///   the `nixosConfigurations` output.
+    /// - The default flake outputs that are compared are the elements of `nixosConfigurations`.
     #[arg(long, verbatim_doc_comment)]
     nixos: bool,
 
