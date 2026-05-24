@@ -194,6 +194,8 @@ impl NdfApp {
                 .map(|name| AttrPath::new(false, vec![name], self.nixos))
                 .collect()
         } else {
+            // In the other branch Nix fetches the sources when computing default attr names.
+            prefetch_sources(&repo, &source, &from, &to)?;
             self.attr_paths
                 .iter()
                 .map(|path| {
@@ -380,6 +382,38 @@ fn get_default_attr_names(
         names.sort();
         names.dedup();
         Ok(names)
+    }
+}
+
+/// Try to force Nix to fetch the Git revisions that will be used for evaluation.
+///
+/// This is to avoid `SQLite database '.../fetcher-cache-v1.sqlite' is busy` errors
+/// that happen when running too many instances of Lix in parallel (as of 2.95.2).
+///
+/// This is only a best-effort attempt, since we won't know all the sources Nix will have to fetch
+/// without actually performing the evaluation.
+fn prefetch_sources(
+    repo_root: &Path,
+    source: &Source,
+    from: &Revision,
+    to: &Revision,
+) -> eyre::Result<()> {
+    let from_commit = from.commit_id();
+    let to_commit = to.commit_id();
+
+    let prefetch_commit = |commit| match source {
+        Source::Flake(flake_path) => nix::prefetch_flake(flake_path, commit),
+        Source::File(_) if let Some(rev) = commit => nix::prefetch_repo(repo_root, rev),
+        Source::File(_) => Ok(()),
+    };
+
+    if from_commit == to_commit {
+        prefetch_commit(from_commit)
+    } else {
+        for commit in [from_commit, to_commit] {
+            prefetch_commit(commit)?;
+        }
+        Ok(())
     }
 }
 

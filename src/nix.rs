@@ -39,7 +39,7 @@ pub(crate) fn get_flake_packages(
             "--apply",
             &format!("flake: builtins.attrNames (flake.packages.{system} or {{ }})"),
         ])
-        .args(["--", &make_flake_ref(flake_path, commit_id)])
+        .args(["--", &make_flake_root_output(flake_path, commit_id)])
         .output_json()
 }
 
@@ -54,7 +54,7 @@ pub(crate) fn get_flake_nixos_configurations(
             "--apply",
             "flake: builtins.attrNames (flake.nixosConfigurations or {})",
         ])
-        .args(["--", &make_flake_ref(flake_path, commit_id)])
+        .args(["--", &make_flake_root_output(flake_path, commit_id)])
         .output_json()
 }
 
@@ -76,6 +76,26 @@ pub(crate) fn get_file_output_attributes(
             ["--arg", "rev", "null"]
         })
         .output_json()
+}
+
+pub(crate) fn prefetch_flake(flake_path: &FlakePath, commit_id: Option<&str>) -> eyre::Result<()> {
+    Cmd::nix()
+        .args(["--extra-experimental-features", "nix-command flakes"])
+        .args(["flake", "archive"])
+        .args(["--", &make_flake_ref(flake_path, commit_id).to_string()])
+        .run_for_exit_code(0..=0)?;
+    Ok(())
+}
+
+pub(crate) fn prefetch_repo(repo_root: &Path, commit_id: &str) -> eyre::Result<()> {
+    Cmd::nix_instantiate()
+        .args(["--eval", "--strict", "--json"])
+        .args(["--expr", include_str!("nix/fetch-repo.nix")])
+        .args(["--argstr", "repoRoot"])
+        .arg(repo_root)
+        .args(["--argstr", "rev", commit_id])
+        .run_for_exit_code(0..=0)?;
+    Ok(())
 }
 
 pub(crate) fn get_drv_path(
@@ -129,7 +149,7 @@ fn get_drv_path_flake(
         // when running multiple evaluations in parallel.
         .arg("--no-eval-cache")
         .args(["--apply", &apply_expr])
-        .args(["--", &make_flake_ref(flake_path, commit_id)])
+        .args(["--", &make_flake_root_output(flake_path, commit_id)])
         .output_json()
 }
 
@@ -158,12 +178,18 @@ fn get_drv_path_file(
         .output_json()
 }
 
-fn make_flake_ref(flake_path: &FlakePath, commit_id: Option<&str>) -> String {
-    let path = flake_path.as_str();
-    match commit_id {
-        Some(rev) => format!("{path}?rev={rev}#."),
-        None => format!("{path}#."),
-    }
+fn make_flake_ref(flake_path: &FlakePath, commit_id: Option<&str>) -> impl fmt::Display {
+    fmt::from_fn(move |f| {
+        let path = flake_path.as_str();
+        match commit_id {
+            Some(rev) => write!(f, "{path}?rev={rev}"),
+            None => write!(f, "{path}"),
+        }
+    })
+}
+
+fn make_flake_root_output(flake_path: &FlakePath, commit_id: Option<&str>) -> String {
+    format!("{}#.", make_flake_ref(flake_path, commit_id))
 }
 
 fn make_path_in_repo<'a>(repo_root: &Path, file_path: &'a Path) -> &'a Path {
