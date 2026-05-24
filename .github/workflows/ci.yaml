@@ -125,7 +125,7 @@ jobs:
           else
             cached_version=""
           fi
-          if [ "$cached_version" = "$LIX_VERSION" ]; then
+          if [ "$cached_version" = "${LIX_VERSION}-${{ matrix.os.nix_system }}" ]; then
             version_matches=true
           else
             version_matches=false
@@ -134,7 +134,7 @@ jobs:
             curl -o "$installer_bin" -sSfL "$installer_url"
             curl -o "$lix_tarball" -sSfL "$lix_url"
             chmod +x "$installer_bin"
-            printf "%s\n" "$LIX_VERSION" > "$installer_version"
+            printf "%s\n" "${LIX_VERSION}-${{ matrix.os.nix_system }}" > "$installer_version"
           fi
 
           NIX_INSTALLER_ENABLE_FLAKES=false "$installer_bin" install --no-confirm --nix-package-url "file://${lix_tarball}"
