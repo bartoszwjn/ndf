@@ -1,4 +1,4 @@
-use std::{fmt, path::Path};
+use std::{fmt, path::Path, sync::Mutex};
 
 use crate::{
     attr_path::AttrPath,
@@ -10,10 +10,20 @@ use crate::{
 mod tests;
 
 fn get_current_system() -> eyre::Result<String> {
-    Cmd::nix_instantiate()
-        .args(["--eval", "--strict", "--json"])
-        .args(["--expr", "builtins.currentSystem"])
-        .output_json()
+    static CURRENT_SYSTEM: Mutex<Option<String>> = Mutex::new(None);
+
+    let mut lock = CURRENT_SYSTEM.lock().unwrap();
+    match &*lock {
+        Some(system) => Ok(system.clone()),
+        None => {
+            let system: String = Cmd::nix_instantiate()
+                .args(["--eval", "--strict", "--json"])
+                .args(["--expr", "builtins.currentSystem"])
+                .output_json()?;
+            *lock = Some(system.clone());
+            Ok(system)
+        }
+    }
 }
 
 pub(crate) fn get_flake_packages(
