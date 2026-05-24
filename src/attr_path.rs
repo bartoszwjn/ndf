@@ -5,7 +5,7 @@ use crate::diff_spec::Source;
 #[cfg(test)]
 mod tests;
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct AttrPath {
     parts: Vec<String>,
     leading_dot: bool,
@@ -166,32 +166,6 @@ impl AttrPath {
         }
 
         Ok(Self::new(leading_dot, parts, false))
-    }
-}
-
-impl fmt::Debug for AttrPath {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.leading_dot {
-            write!(f, ".")?;
-        } else if self.parts.is_empty() {
-            write!(f, "(empty)")?;
-        }
-
-        let mut first = true;
-        for part in &self.parts {
-            if first {
-                first = false;
-                write!(f, "{part:?}")?;
-            } else {
-                write!(f, ".{part:?}")?;
-            }
-        }
-
-        if self.nixos {
-            write!(f, " (NixOS)")?;
-        }
-
-        Ok(())
     }
 }
 

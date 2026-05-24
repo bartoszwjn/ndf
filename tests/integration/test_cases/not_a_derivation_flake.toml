@@ -53,14 +53,14 @@ Summary:
   ??     error
 """
 stderr = """
-ERROR eval_drv_path{attr_path="set" commit_id="@COMMIT_1_ID@"}: 
+ERROR eval_drv_path{attr_path=set commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got set
-ERROR eval_drv_path{attr_path="set-with-_type" commit_id="@COMMIT_1_ID@"}: 
+ERROR eval_drv_path{attr_path=set-with-_type commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got set (with _type = fileset)
-ERROR eval_drv_path{attr_path="set-with-type" commit_id="@COMMIT_1_ID@"}: 
+ERROR eval_drv_path{attr_path=set-with-type commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got set (with type = configuration)
-ERROR eval_drv_path{attr_path="set-with-types" commit_id="@COMMIT_1_ID@"}: 
+ERROR eval_drv_path{attr_path=set-with-types commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got set (with type = primary)
-ERROR eval_drv_path{attr_path="string" commit_id="@COMMIT_1_ID@"}: 
+ERROR eval_drv_path{attr_path=string commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got string
 """
