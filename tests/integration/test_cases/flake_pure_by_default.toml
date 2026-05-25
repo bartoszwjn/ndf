@@ -1,0 +1,40 @@
+[command]
+args = ["--to=@"]
+env.NDF_TESTS_NIX_PKG_NAME = "from-env"
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."flake.nix" = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+      pkgName = "pkg-${builtins.getEnv "NDF_TESTS_NIX_PKG_NAME"}";
+    in
+    {
+      packages.@SYSTEM@ = {
+        ${pkgName} = drv pkgName;
+      };
+    };
+}
+"""
+
+[outputs]
+exit_code = 0
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+Tool:  none
+Attribute paths:
+  pkg-
+
+Summary:
+  pkg- /nix/store/8mlfpnyq995cdlksdq4mxc4ndr58ny59-pkg-.drv
+  ==   /nix/store/8mlfpnyq995cdlksdq4mxc4ndr58ny59-pkg-.drv
+"""
+stderr = ""

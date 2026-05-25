@@ -14,6 +14,7 @@ pub(crate) struct DiffSpec {
     pub(crate) repo: PathBuf,
     pub(crate) from: Revision,
     pub(crate) to: Revision,
+    pub(crate) impure: bool,
     pub(crate) tool: DiffTool,
     pub(crate) base: Option<AttrPath>,
     pub(crate) attr_paths: Vec<AttrPath>,
@@ -84,7 +85,7 @@ impl Revision {
 
 impl std::fmt::Display for DiffSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::styles::{HEADER, SOURCE};
+        use crate::styles::{HEADER, IMPURE, SOURCE};
 
         fn header(name: &str) -> impl fmt::Display {
             const MIN_WIDTH: usize = 5;
@@ -92,16 +93,20 @@ impl std::fmt::Display for DiffSpec {
             fmt::from_fn(move |f| write!(f, "{HEADER}{name}:{HEADER:#}{:pad_width$}", ""))
         }
 
-        let (source_header, source_path) = match &self.source {
-            Source::Flake(flake_path) => ("Flake", flake_path.as_path()),
-            Source::File(path) => ("File", path.as_path()),
-        };
-        writeln!(
-            f,
-            "{} {SOURCE}{}{SOURCE:#}",
-            header(source_header),
-            source_path.display(),
-        )?;
+        match &self.source {
+            Source::Flake(flake_path) => {
+                let flake_path = flake_path.as_str();
+                write!(f, "{} {SOURCE}{flake_path}{SOURCE:#}", header("Flake"))?;
+                if self.impure {
+                    write!(f, " {IMPURE}(impure){IMPURE:#}")?;
+                }
+                writeln!(f)?;
+            }
+            Source::File(path) => {
+                let path = path.display();
+                writeln!(f, "{} {SOURCE}{path}{SOURCE:#}", header("File"))?
+            }
+        }
 
         writeln!(f, "{} {}", header("Repo"), self.repo.display())?;
         writeln!(f, "{} {}", header("From"), self.from)?;

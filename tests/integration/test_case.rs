@@ -25,6 +25,7 @@ pub(crate) struct TestCase {
 struct CommandConfig {
     args: Vec<String>,
     current_dir: Option<String>,
+    env: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -119,6 +120,9 @@ impl CommandConfig {
             dir
         };
         cmd.current_dir(current_dir).args(&self.args);
+        if let Some(env) = &self.env {
+            cmd.envs(env);
+        }
 
         let output = {
             // Running too many instances of Lix (as of 2.95.2) in parallel causes

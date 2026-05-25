@@ -79,6 +79,12 @@ pub struct NdfApp {
     #[arg(long, verbatim_doc_comment)]
     nixos: bool,
 
+    /// Evaluate flake outputs without pure evaluation mode.
+    ///
+    /// Has no effect when used with `--file`.
+    #[arg(long)]
+    impure: bool,
+
     /// Maximum number of Nix evaluations to perform in parallel.
     ///
     /// When set to zero (the default), the number of CPUs in the system will be used.
@@ -188,7 +194,7 @@ impl NdfApp {
             .wrap_err_with(|| format!("invalid value for option '--base': {:?}", self.base))?;
 
         let attr_paths = if self.attr_paths.is_empty() {
-            get_default_attr_names(&repo, &source, &from, &to, self.nixos)
+            get_default_attr_names(&repo, &source, &from, &to, self.nixos, self.impure)
                 .wrap_err("failed to determine default attribute paths")?
                 .into_iter()
                 .map(|name| AttrPath::new(false, vec![name], self.nixos))
@@ -211,6 +217,7 @@ impl NdfApp {
             repo,
             from,
             to,
+            impure: self.impure,
             tool: self.tool,
             base,
             attr_paths,
@@ -362,15 +369,16 @@ fn get_default_attr_names(
     from: &Revision,
     to: &Revision,
     nixos: bool,
+    impure: bool,
 ) -> eyre::Result<Vec<String>> {
     let from_commit = from.commit_id();
     let to_commit = to.commit_id();
 
     let get_for_commit = |commit_id| match source {
         Source::Flake(flake_path) if nixos => {
-            nix::get_flake_nixos_configurations(flake_path, commit_id)
+            nix::get_flake_nixos_configurations(flake_path, commit_id, impure)
         }
-        Source::Flake(flake_path) => nix::get_flake_packages(flake_path, commit_id),
+        Source::Flake(flake_path) => nix::get_flake_packages(flake_path, commit_id, impure),
         Source::File(file_path) => nix::get_file_output_attributes(repo_root, file_path, commit_id),
     };
 

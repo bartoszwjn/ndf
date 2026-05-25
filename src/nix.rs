@@ -29,12 +29,14 @@ fn get_current_system() -> eyre::Result<String> {
 pub(crate) fn get_flake_packages(
     flake_path: &FlakePath,
     commit_id: Option<&str>,
+    impure: bool,
 ) -> eyre::Result<Vec<String>> {
     let current_system = get_current_system()?;
     let system = to_string_literal(&current_system);
     Cmd::nix()
         .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["eval", "--json"])
+        .args(if impure { ["--impure"].as_slice() } else { &[] })
         .args([
             "--apply",
             &format!("flake: builtins.attrNames (flake.packages.{system} or {{ }})"),
@@ -46,10 +48,12 @@ pub(crate) fn get_flake_packages(
 pub(crate) fn get_flake_nixos_configurations(
     flake_path: &FlakePath,
     commit_id: Option<&str>,
+    impure: bool,
 ) -> eyre::Result<Vec<String>> {
     Cmd::nix()
         .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["eval", "--json"])
+        .args(if impure { ["--impure"].as_slice() } else { &[] })
         .args([
             "--apply",
             "flake: builtins.attrNames (flake.nixosConfigurations or {})",
@@ -103,9 +107,10 @@ pub(crate) fn get_drv_path(
     source: &Source,
     commit_id: Option<&str>,
     attr_path: &AttrPath,
+    impure: bool,
 ) -> eyre::Result<Option<String>> {
     let result = match source {
-        Source::Flake(flake_path) => get_drv_path_flake(flake_path, commit_id, attr_path)?,
+        Source::Flake(flake_path) => get_drv_path_flake(flake_path, commit_id, attr_path, impure)?,
         Source::File(file_path) => get_drv_path_file(repo_root, file_path, commit_id, attr_path)?,
     };
     match result {
@@ -129,6 +134,7 @@ fn get_drv_path_flake(
     flake_path: &FlakePath,
     commit_id: Option<&str>,
     attr_path: &AttrPath,
+    impure: bool,
 ) -> eyre::Result<GetDrvPathResult> {
     let apply_expr_base = include_str!("nix/get-drv-path-flake.nix");
     let (has_leading_dot, attr_path_parts) = attr_path.flake_query();
@@ -144,6 +150,7 @@ fn get_drv_path_flake(
     Cmd::nix()
         .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["eval", "--json"])
+        .args(if impure { ["--impure"].as_slice() } else { &[] })
         // Eval cache hardly works, sometimes it even seems to make things slower.
         // It also causes Nix to report "SQLite database is busy" errors
         // when running multiple evaluations in parallel.

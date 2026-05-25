@@ -1,0 +1,34 @@
+[command]
+args = ["--to=@", "--file", "."]
+env.NDF_TESTS_NIX_PKG_NAME = "from-env"
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."default.nix" = """
+let
+  drv = import ./drv.nix;
+  pkgName = builtins.getEnv "NDF_TESTS_NIX_PKG_NAME";
+in
+{
+  ${pkgName} = drv pkgName;
+}
+"""
+
+[outputs]
+exit_code = 0
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+Tool:  none
+Attribute paths:
+  from-env
+
+Summary:
+  from-env /nix/store/jf9hzp6r3cnz07zdlsi00qc4ag7m3qh2-from-env.drv
+  ==       /nix/store/jf9hzp6r3cnz07zdlsi00qc4ag7m3qh2-from-env.drv
+"""
+stderr = ""
