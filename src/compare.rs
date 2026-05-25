@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+
 use crate::{
     attr_path::AttrPath,
     cli::DiffTool,
@@ -25,7 +27,7 @@ pub(crate) fn compare_paths<'spec>(
                 && old_drv_path != new_drv_path
             {
                 print_pair_cmp(lhs_spec.attr_path, rhs_spec.attr_path, spec);
-                run_nix_diff(old_drv_path, new_drv_path)?;
+                run_nix_diff(old_drv_path, new_drv_path, &spec.tool_extra_args)?;
                 anstream::println!();
             }
         }
@@ -52,13 +54,13 @@ fn print_pair_cmp(lhs: &AttrPath, rhs: &AttrPath, spec: &DiffSpec) {
     anstream::println!("{TO}+{TO:#} {}{:rhs_pad$} {to}", rhs.display(), "");
 }
 
-fn run_nix_diff(old_drv_path: &str, new_drv_path: &str) -> eyre::Result<()> {
+fn run_nix_diff(
+    old_drv_path: &str,
+    new_drv_path: &str,
+    extra_args: impl IntoIterator<Item = impl AsRef<OsStr>>,
+) -> eyre::Result<()> {
     Cmd::nix_diff()
-        .args([
-            "--character-oriented",
-            "--skip-already-compared",
-            old_drv_path,
-            new_drv_path,
-        ])
+        .args([old_drv_path, new_drv_path])
+        .args(extra_args)
         .run_inherit_stdio()
 }

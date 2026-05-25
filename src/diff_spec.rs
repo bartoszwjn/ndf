@@ -1,11 +1,11 @@
 use std::{
-    fmt,
+    fmt, iter,
     path::{Path, PathBuf},
 };
 
 use eyre::bail;
 
-use crate::{attr_path::AttrPath, cli::DiffTool};
+use crate::{attr_path::AttrPath, cli::DiffTool, display};
 
 #[derive(Clone, Debug)]
 pub(crate) struct DiffSpec {
@@ -16,6 +16,7 @@ pub(crate) struct DiffSpec {
     pub(crate) to: Revision,
     pub(crate) impure: bool,
     pub(crate) tool: DiffTool,
+    pub(crate) tool_extra_args: Vec<String>,
     pub(crate) base: Option<AttrPath>,
     pub(crate) attr_paths: Vec<AttrPath>,
 }
@@ -117,7 +118,10 @@ impl std::fmt::Display for DiffSpec {
             DiffTool::NixDiff => Some("nix-diff"),
         };
         if let Some(tool) = tool {
-            writeln!(f, "{} {}", header("Tool"), tool)?;
+            let tool_cmd = display::display_command_args(|| {
+                iter::chain([tool], self.tool_extra_args.iter().map(String::as_str))
+            });
+            writeln!(f, "{} {}", header("Tool"), tool_cmd)?;
         }
 
         if let Some(base) = &self.base {

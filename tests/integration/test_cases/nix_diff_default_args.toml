@@ -1,0 +1,50 @@
+[command]
+args = ["--file", ".", "--tool", "nix-diff"]
+
+[repo_contents]
+
+[[repo_contents.commits]]
+message = "commit 1"
+files."default.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1-1";
+}
+"""
+
+[[repo_contents.commits]]
+message = "commit 2"
+files."default.nix" = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1-2";
+}
+"""
+
+[outputs]
+exit_code = 1
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ commit 1
+To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+Tool:  nix-diff --skip-already-compared --character-oriented
+Attribute paths:
+  pkg1
+
+- pkg1 @COMMIT_1_SHORT_ID@ commit 1
++ pkg1 @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+- /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv:{out}
++ /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv:{out}
+• The environments do not match:
+    name=pkg1-←1←→2→
+
+Summary:
+  pkg1 /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv
+  !=   /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv
+"""
+stderr = ""

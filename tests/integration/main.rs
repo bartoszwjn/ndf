@@ -47,6 +47,8 @@ test_cases!(
     flake_pure_by_default,
     manual_selection_file,
     manual_selection_flake,
+    nix_diff_custom_args,
+    nix_diff_default_args,
     nixos_file,
     nixos_flake,
     nixos_manual_selection_file,

@@ -54,10 +54,6 @@ pub struct NdfApp {
     #[arg(long)]
     base: Option<String>,
 
-    /// Program used for comparing derivations.
-    #[arg(long, default_value = "none")]
-    tool: DiffTool,
-
     /// Interpret paths as attribute paths relative to the flake at the given path.
     ///
     /// Only local filesystem paths are supported,
@@ -84,6 +80,30 @@ pub struct NdfApp {
     /// Has no effect when used with `--file`.
     #[arg(long)]
     impure: bool,
+
+    /// Program used for comparing derivations.
+    #[arg(long, default_value = "none")]
+    tool: DiffTool,
+
+    /// Additional arguments passed to the tool that compares derivations.
+    ///
+    /// The default value depends on the tool:
+    /// - `nix-diff`: ["--skip-already-compared", "--character-oriented"]
+    ///
+    /// Note on parsing: after encountering `--tool-extra-args` all further arguments
+    /// will be treated as values for this option, until an optional end marker value `;`.
+    /// When mixing this option with other options, either:
+    /// - specify this option last,
+    /// - use `;` to mark where values for this option end,
+    /// - use `--tool-extra-args=<value>` to pass one value at a time (can be repeated).
+    #[arg(
+        long,
+        num_args = 0..,
+        allow_hyphen_values = true,
+        value_terminator = ";",
+        verbatim_doc_comment,
+    )]
+    tool_extra_args: Option<Vec<String>>,
 
     /// Maximum number of Nix evaluations to perform in parallel.
     ///
@@ -186,6 +206,10 @@ impl NdfApp {
         let from = self.make_from(&repo, &mut worktree_is_clean)?;
         let to = self.make_to(&repo, &mut worktree_is_clean)?;
 
+        let tool_extra_args = self
+            .tool_extra_args
+            .unwrap_or_else(|| default_tool_args(self.tool));
+
         let base = self
             .base
             .as_deref()
@@ -219,6 +243,7 @@ impl NdfApp {
             to,
             impure: self.impure,
             tool: self.tool,
+            tool_extra_args,
             base,
             attr_paths,
         })
@@ -361,6 +386,15 @@ fn resolve_git_commit(commit: Option<&str>, repo_root: &Path) -> eyre::Result<Re
     let commit_id = git::resolve_commit(commit, repo_root)?;
     let display = git::show_commit(&commit_id, repo_root)?;
     Ok(Revision::GitRevision { commit_id, display })
+}
+
+fn default_tool_args(tool: DiffTool) -> Vec<String> {
+    match tool {
+        DiffTool::None => Vec::new(),
+        DiffTool::NixDiff => ["--skip-already-compared", "--character-oriented"]
+            .map(String::from)
+            .into(),
+    }
 }
 
 fn get_default_attr_names(

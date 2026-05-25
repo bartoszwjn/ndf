@@ -9,6 +9,8 @@ use color_eyre::{Section, SectionExt};
 use eyre::{WrapErr, eyre};
 use serde::de::DeserializeOwned;
 
+use crate::display;
+
 #[derive(Debug)]
 pub(crate) struct Cmd {
     inner: Command,
@@ -178,7 +180,7 @@ fn trace_program(command: &Command) {
 }
 
 fn display_command(command: &Command) -> impl fmt::Display {
-    display_args_iter(|| {
+    display::display_command_args(|| {
         [command.get_program()]
             .into_iter()
             .chain(command.get_args())
@@ -186,51 +188,9 @@ fn display_command(command: &Command) -> impl fmt::Display {
 }
 
 fn display_program(command: &Command) -> impl fmt::Display {
-    display_arg(command.get_program())
+    display::display_command_arg(command.get_program())
 }
 
 fn display_args(command: &Command) -> impl fmt::Display {
-    display_args_iter(|| command.get_args())
-}
-
-fn display_args_iter<'a, Iter>(make_iter: impl Fn() -> Iter) -> impl fmt::Display
-where
-    Iter: Iterator<Item = &'a OsStr>,
-{
-    fmt::from_fn(move |f| {
-        let mut first = true;
-        for arg in make_iter() {
-            let arg = display_arg(arg);
-            if first {
-                write!(f, "{arg}")?;
-                first = false;
-            } else {
-                write!(f, " {arg}")?;
-            }
-        }
-        Ok(())
-    })
-}
-
-fn display_arg(arg: &OsStr) -> impl fmt::Display {
-    fn needs_quoting(c: char) -> bool {
-        match c {
-            '"' | '\'' | '\\' => true,
-            _ if c.is_whitespace() => true,
-
-            _ if c.is_alphanumeric() => false,
-            _ if c.is_ascii_punctuation() => false,
-
-            _ => true,
-        }
-    }
-
-    let arg = arg.to_string_lossy();
-    fmt::from_fn(move |f| {
-        if arg.is_empty() || arg.chars().any(needs_quoting) {
-            write!(f, "{arg:?}")
-        } else {
-            write!(f, "{arg}")
-        }
-    })
+    display::display_command_args(|| command.get_args())
 }
