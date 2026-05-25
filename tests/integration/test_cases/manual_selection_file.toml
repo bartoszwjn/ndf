@@ -36,7 +36,6 @@ File:  @REPO@/manual-selection.nix
 Repo:  @REPO@
 From:  @COMMIT_1_SHORT_ID@ commit 1
 To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
-Tool:  none
 Attribute paths:
   a.pkg2
   pkg1

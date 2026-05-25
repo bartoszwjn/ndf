@@ -33,7 +33,6 @@ File:  @REPO@/default.nix
 Repo:  @REPO@
 From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
 To:    [worktree]
-Tool:  none
 Attribute paths:
   pkg1
   pkg2

@@ -23,7 +23,6 @@ File:  @REPO@/default.nix
 Repo:  @REPO@
 From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
 To:    @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
-Tool:  none
 Attribute paths:
   from-env
 

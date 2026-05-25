@@ -113,10 +113,12 @@ impl std::fmt::Display for DiffSpec {
         writeln!(f, "{} {}", header("To"), self.to)?;
 
         let tool = match self.tool {
-            DiffTool::None => "none",
-            DiffTool::NixDiff => "nix-diff",
+            DiffTool::None => None,
+            DiffTool::NixDiff => Some("nix-diff"),
         };
-        writeln!(f, "{} {}", header("Tool"), tool)?;
+        if let Some(tool) = tool {
+            writeln!(f, "{} {}", header("Tool"), tool)?;
+        }
 
         if let Some(base) = &self.base {
             writeln!(f, "{} {}", header("Base"), base.display())?;
