@@ -151,6 +151,13 @@ jobs:
           nix-instantiate --version
           nix-instantiate --eval --strict --expr '{ inherit (builtins) currentSystem langVersion nixVersion storeDir; }'
 
+      - name: Install tools
+        run: |
+          nix --extra-experimental-features "nix-command flakes" \
+            profile ${{ case(matrix.nix == 'Lix', 'install', 'add') }} \
+            --inputs-from . \
+            "nixpkgs#nix-diff"
+
       - name: Install Rust toolchain
         run: rustup toolchain install
 
