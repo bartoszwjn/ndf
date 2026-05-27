@@ -88,14 +88,17 @@ pub struct NdfApp {
     /// Additional arguments passed to the tool that compares derivations.
     ///
     /// The default value depends on the tool:
-    /// - `nix-diff`: ["--skip-already-compared", "--character-oriented"]
+    /// - `nix-diff`: `["--skip-already-compared", "--character-oriented"]`
     ///
     /// Note on parsing: after encountering `--tool-extra-args` all further arguments
     /// will be treated as values for this option, until an optional end marker value `;`.
+    ///
     /// When mixing this option with other options, either:
-    /// - specify this option last,
-    /// - use `;` to mark where values for this option end,
+    /// - specify `--tool-extra-args` last,
+    /// - use `;` to mark where values for `--tool-extra-args` end,
     /// - use `--tool-extra-args=<value>` to pass one value at a time (can be repeated).
+    ///
+    /// In most shells the `;` argument needs to be quoted.
     #[arg(
         long,
         num_args = 0..,
