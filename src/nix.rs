@@ -3,7 +3,7 @@ use std::{fmt, path::Path, sync::Mutex};
 use crate::{
     attr_path::AttrPath,
     command::Cmd,
-    diff_spec::{FlakePath, Source},
+    source::{FlakePath, Source},
 };
 
 #[cfg(test)]

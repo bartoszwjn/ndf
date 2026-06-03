@@ -7,6 +7,7 @@ mod display;
 mod eval;
 mod git;
 mod nix;
+mod source;
 mod styles;
 mod summary;
 

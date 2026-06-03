@@ -1,17 +1,13 @@
-use std::{
-    ffi::{OsStr, OsString},
-    fs,
-    path::{Path, PathBuf},
-    process::ExitCode,
-};
+use std::{ffi::OsString, path::Path, process::ExitCode};
 
-use eyre::{WrapErr, bail, eyre};
+use eyre::WrapErr;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
     attr_path::AttrPath,
-    diff_spec::{DiffSpec, FlakePath, Revision, Source},
+    diff_spec::{DiffSpec, Revision},
     eval, git, nix,
+    source::Source,
     summary::EvalResultCmp,
 };
 
@@ -183,18 +179,16 @@ impl NdfApp {
     }
 
     fn build_diff_spec(self) -> eyre::Result<DiffSpec> {
-        let source = match &self.file {
-            Some(file) => {
-                assert_eq!(self.flake, ".");
-                Source::File(
-                    validate_file_argument(file)
-                        .wrap_err_with(|| format!("invalid value for option '--file': {file:?}"))?,
-                )
-            }
-            None => Source::Flake(validate_flake_argument(&self.flake).wrap_err_with(|| {
-                format!("invalid value for option '--flake': {:?}", self.flake)
-            })?),
+        let source = if let Some(file) = &self.file {
+            assert_eq!(self.flake, ".");
+            Source::file(file)
+                .wrap_err_with(|| format!("invalid value for option '--file': {file:?}"))?
+        } else {
+            let flake = &self.flake;
+            Source::flake(flake)
+                .wrap_err_with(|| format!("invalid value for option '--flake': {flake:?}"))?
         };
+
         let repo = git::get_repo_root(match &source {
             Source::Flake(flake_path) => flake_path.as_path(),
             Source::File(file_path) => file_path,
@@ -288,97 +282,6 @@ impl NdfApp {
         };
         resolve_git_commit(commit, repo_root)
     }
-}
-
-fn validate_flake_argument(flake: &str) -> eyre::Result<FlakePath> {
-    let path = Path::new(flake);
-    // Based on the path-like syntax described in `nix flake --help`,
-    // but we allow relative paths to start with `../` as well for convenience.
-    //
-    // https://nix.dev/manual/nix/2.33/command-ref/new-cli/nix3-flake.html#path-like-syntax
-    //
-    // Nix doesn't actually require relative paths to start with `./`,
-    // a `.` anywhere inside the path is enough for it not to be treated as a `flake:` shorthand,
-    // so in practice Nix allows this as well.
-    if !(path.is_absolute() || path.starts_with(".") || path.starts_with("..")) {
-        bail!("flake paths must be absolute paths, or start with './' or '../'");
-    }
-    if flake.contains(['#', '?']) {
-        bail!("flake paths must not contain '#' or '?' characters");
-    }
-
-    let path = path
-        .canonicalize()
-        .wrap_err_with(|| format!("failed to resolve path {path:?}"))?;
-    let metadata = path
-        .metadata()
-        .wrap_err_with(|| format!("failed to query metadata of {path:?}"))?;
-    if !metadata.is_dir() {
-        bail!("{path:?} is not a directory");
-    }
-
-    let mut flake_path = path.clone();
-    loop {
-        flake_path.push("flake.nix");
-        let has_flake_nix = flake_path
-            .try_exists()
-            .wrap_err_with(|| format!("failed to check for existence of {flake_path:?}"))?;
-        flake_path.pop();
-        if has_flake_nix {
-            return FlakePath::new(flake_path);
-        }
-
-        flake_path.push(".git");
-        let has_dot_git = flake_path
-            .try_exists()
-            .wrap_err_with(|| format!("failed to check for existence of {flake_path:?}"))?;
-        flake_path.pop();
-        if has_dot_git || &flake_path == "/" {
-            bail!(
-                "path {path:?} is not part of a flake \
-                (neither it nor its parent directories contain a 'flake.nix' file)"
-            );
-        }
-
-        flake_path.pop();
-    }
-}
-
-fn validate_file_argument(file: &OsStr) -> eyre::Result<PathBuf> {
-    let s = file.to_string_lossy();
-
-    if file.is_empty() {
-        return Err(eyre!("empty paths are not supported"));
-    }
-    // Reject special forms accepted by `nix`'s `--file` option.
-    // https://docs.lix.systems/manual/lix/2.94/command-ref/nix-build.html#fileish-syntax
-    if s.starts_with('<') && s.ends_with('>') {
-        return Err(eyre!(
-            "search paths (paths surrounded by '<' and '>') are not supported"
-        ));
-    }
-    for prefix in ["http://", "https://", "flake:", "channel:"] {
-        if s.starts_with(prefix) {
-            return Err(eyre!("paths starting with {prefix:?} are not supported"));
-        }
-    }
-
-    let mut absolute =
-        fs::canonicalize(file).wrap_err_with(|| format!("failed to resolve path {file:?}"))?;
-    let mut metadata = fs::metadata(&absolute)
-        .wrap_err_with(|| format!("failed to query metadata of {absolute:?}"))?;
-
-    if metadata.file_type().is_dir() {
-        absolute.push("default.nix");
-        metadata = fs::metadata(&absolute)
-            .wrap_err(format!("failed to query metadata of {absolute:?}"))?;
-    }
-
-    if metadata.file_type().is_dir() {
-        bail!("{absolute:?} is a directory");
-    }
-
-    Ok(absolute)
 }
 
 fn resolve_git_commit(commit: Option<&str>, repo_root: &Path) -> eyre::Result<Revision> {

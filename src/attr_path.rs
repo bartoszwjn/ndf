@@ -1,6 +1,6 @@
 use std::{fmt, iter};
 
-use crate::diff_spec::Source;
+use crate::source::Source;
 
 #[cfg(test)]
 mod tests;

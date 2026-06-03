@@ -1,11 +1,6 @@
-use std::{
-    fmt, iter,
-    path::{Path, PathBuf},
-};
+use std::{fmt, iter, path::PathBuf};
 
-use eyre::bail;
-
-use crate::{attr_path::AttrPath, cli::DiffTool, display};
+use crate::{attr_path::AttrPath, cli::DiffTool, display, source::Source};
 
 #[derive(Clone, Debug)]
 pub(crate) struct DiffSpec {
@@ -22,57 +17,9 @@ pub(crate) struct DiffSpec {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum Source {
-    Flake(FlakePath),
-    /// Absolute, canonicalized path to the file.
-    File(PathBuf),
-}
-
-/// Absolute, canonicalized path to the directory containing the `flake.nix` file.
-///
-/// Guaranteed to contain only characters that can be used in path-like flake references.
-#[derive(Clone, Debug)]
-pub(crate) struct FlakePath(String);
-
-#[derive(Clone, Debug)]
 pub(crate) enum Revision {
     GitRevision { commit_id: String, display: String },
     GitWorktree,
-}
-
-impl FlakePath {
-    pub(crate) fn new(path: PathBuf) -> eyre::Result<Self> {
-        assert!(path.is_absolute());
-        let string = match path.into_os_string().into_string() {
-            Ok(string) => string,
-            Err(os_string) => bail!("flake path contains invalid Unicode: {os_string:?}"),
-        };
-        if let Some(invalid) = string.chars().find(|&c| !Self::is_valid_char(c)) {
-            bail!(
-                "flake path contains an invalid character: {}",
-                invalid.escape_default(),
-            )
-        }
-        Ok(Self(string))
-    }
-
-    fn is_valid_char(c: char) -> bool {
-        // Nix allows all unicode characters except `#` and `?`, but Lix is more restrictive:
-        // https://nix.dev/manual/nix/2.33/command-ref/new-cli/nix3-flake.html#path-like-syntax
-        // https://git.lix.systems/lix-project/lix/src/commit/2.94.0/lix/libexpr/flake/flakeref.cc#L86
-        //
-        // TODO: it should be possible to express any path using URL-like syntax
-        // with percent encoding.
-        c.is_ascii_alphanumeric() || "-._~!$&'\"()*+,;=/".contains(c)
-    }
-
-    pub(crate) fn as_path(&self) -> &Path {
-        self.0.as_ref()
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        self.0.as_ref()
-    }
 }
 
 impl Revision {
