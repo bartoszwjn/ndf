@@ -10,6 +10,7 @@ mod nix;
 mod source;
 mod styles;
 mod summary;
+mod vcs;
 
 #[doc(hidden)]
 pub use cli::NdfApp;

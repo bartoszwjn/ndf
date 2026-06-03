@@ -1,12 +1,17 @@
-use std::{fmt, iter, path::PathBuf};
+use std::{fmt, iter};
 
-use crate::{attr_path::AttrPath, cli::DiffTool, display, source::Source};
+use crate::{
+    attr_path::AttrPath,
+    cli::DiffTool,
+    display,
+    source::Source,
+    vcs::{Repository, Revision},
+};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct DiffSpec {
     pub(crate) source: Source,
-    /// Absolute, canonicalized path to repository root.
-    pub(crate) repo: PathBuf,
+    pub(crate) repo: Repository,
     pub(crate) from: Revision,
     pub(crate) to: Revision,
     pub(crate) impure: bool,
@@ -14,21 +19,6 @@ pub(crate) struct DiffSpec {
     pub(crate) tool_extra_args: Vec<String>,
     pub(crate) base: Option<AttrPath>,
     pub(crate) attr_paths: Vec<AttrPath>,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum Revision {
-    GitRevision { commit_id: String, display: String },
-    GitWorktree,
-}
-
-impl Revision {
-    pub(crate) fn commit_id(&self) -> Option<&str> {
-        match self {
-            Revision::GitRevision { commit_id, .. } => Some(commit_id),
-            Revision::GitWorktree => None,
-        }
-    }
 }
 
 impl std::fmt::Display for DiffSpec {
@@ -56,7 +46,7 @@ impl std::fmt::Display for DiffSpec {
             }
         }
 
-        writeln!(f, "{} {}", header("Repo"), self.repo.display())?;
+        writeln!(f, "{} {}", header("Repo"), self.repo)?;
         writeln!(f, "{} {}", header("From"), self.from)?;
         writeln!(f, "{} {}", header("To"), self.to)?;
 
@@ -80,18 +70,5 @@ impl std::fmt::Display for DiffSpec {
         }
 
         Ok(())
-    }
-}
-
-impl std::fmt::Display for Revision {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::GitRevision { display, .. } => f.write_str(display),
-            // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
-            Self::GitWorktree => {
-                use crate::styles::WORKTREE;
-                write!(f, "{WORKTREE}[worktree]{WORKTREE:#}")
-            }
-        }
     }
 }

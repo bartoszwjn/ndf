@@ -1,14 +1,15 @@
-use std::{ffi::OsString, path::Path, process::ExitCode};
+use std::{ffi::OsString, process::ExitCode};
 
 use eyre::WrapErr;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
     attr_path::AttrPath,
-    diff_spec::{DiffSpec, Revision},
-    eval, git, nix,
+    diff_spec::DiffSpec,
+    eval, nix,
     source::Source,
     summary::EvalResultCmp,
+    vcs::{Repository, Revision},
 };
 
 const AFTER_HELP: &str = "\
@@ -189,19 +190,9 @@ impl NdfApp {
                 .wrap_err_with(|| format!("invalid value for option '--flake': {flake:?}"))?
         };
 
-        let repo = git::get_repo_root(match &source {
-            Source::Flake(flake_path) => flake_path.as_path(),
-            Source::File(file_path) => file_path,
-        })?;
-
-        let mut worktree_status = None;
-        let mut worktree_is_clean = || match worktree_status {
-            Some(cached) => Ok(cached),
-            None => Ok(*worktree_status.insert(git::working_tree_is_clean(&repo)?)),
-        };
-
-        let from = self.make_from(&repo, &mut worktree_is_clean)?;
-        let to = self.make_to(&repo, &mut worktree_is_clean)?;
+        let mut repo = Repository::for_source(&source)?;
+        let from = self.make_from(&mut repo)?;
+        let to = self.make_to(&mut repo)?;
 
         let tool_extra_args = self
             .tool_extra_args
@@ -246,16 +237,12 @@ impl NdfApp {
         })
     }
 
-    fn make_from(
-        &self,
-        repo_root: &Path,
-        worktree_is_clean: impl FnOnce() -> eyre::Result<bool>,
-    ) -> eyre::Result<Revision> {
+    fn make_from(&self, repo: &mut Repository) -> eyre::Result<Revision> {
         let commit = match &self.from {
             Some(from) => Some(from.as_str()),
             None => match (
                 self.to.is_some() || self.base.is_some(),
-                worktree_is_clean()?,
+                repo.worktree_is_clean()?,
             ) {
                 // Same default as `--to`
                 (true, true) => Some("HEAD"),
@@ -265,33 +252,19 @@ impl NdfApp {
                 (false, false) => Some("HEAD"),
             },
         };
-        resolve_git_commit(commit, repo_root)
+        repo.resolve_commit(commit)
     }
 
-    fn make_to(
-        &self,
-        repo_root: &Path,
-        worktree_is_clean: impl FnOnce() -> eyre::Result<bool>,
-    ) -> eyre::Result<Revision> {
+    fn make_to(&self, repo: &mut Repository) -> eyre::Result<Revision> {
         let commit = match &self.to {
             Some(to) => Some(to.as_str()),
-            None => match worktree_is_clean()? {
+            None => match repo.worktree_is_clean()? {
                 true => Some("HEAD"),
                 false => None,
             },
         };
-        resolve_git_commit(commit, repo_root)
+        repo.resolve_commit(commit)
     }
-}
-
-fn resolve_git_commit(commit: Option<&str>, repo_root: &Path) -> eyre::Result<Revision> {
-    let Some(commit) = commit else {
-        return Ok(Revision::GitWorktree);
-    };
-
-    let commit_id = git::resolve_commit(commit, repo_root)?;
-    let display = git::show_commit(&commit_id, repo_root)?;
-    Ok(Revision::GitRevision { commit_id, display })
 }
 
 fn default_tool_args(tool: DiffTool) -> Vec<String> {
@@ -304,7 +277,7 @@ fn default_tool_args(tool: DiffTool) -> Vec<String> {
 }
 
 fn get_default_attr_names(
-    repo_root: &Path,
+    repo: &Repository,
     source: &Source,
     from: &Revision,
     to: &Revision,
@@ -319,7 +292,9 @@ fn get_default_attr_names(
             nix::get_flake_nixos_configurations(flake_path, commit_id, impure)
         }
         Source::Flake(flake_path) => nix::get_flake_packages(flake_path, commit_id, impure),
-        Source::File(file_path) => nix::get_file_output_attributes(repo_root, file_path, commit_id),
+        Source::File(file_path) => {
+            nix::get_file_output_attributes(repo.root(), file_path, commit_id)
+        }
     };
 
     if from_commit == to_commit {
@@ -341,7 +316,7 @@ fn get_default_attr_names(
 /// This is only a best-effort attempt, since we won't know all the sources Nix will have to fetch
 /// without actually performing the evaluation.
 fn prefetch_sources(
-    repo_root: &Path,
+    repo: &Repository,
     source: &Source,
     from: &Revision,
     to: &Revision,
@@ -351,7 +326,7 @@ fn prefetch_sources(
 
     let prefetch_commit = |commit| match source {
         Source::Flake(flake_path) => nix::prefetch_flake(flake_path, commit),
-        Source::File(_) if let Some(rev) = commit => nix::prefetch_repo(repo_root, rev),
+        Source::File(_) if let Some(rev) = commit => nix::prefetch_repo(repo.root(), rev),
         Source::File(_) => Ok(()),
     };
 
