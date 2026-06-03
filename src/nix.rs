@@ -87,8 +87,7 @@ pub(crate) fn prefetch_flake(flake_path: &FlakePath, commit_id: Option<&str>) ->
         .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["flake", "archive"])
         .args(["--", &make_flake_ref(flake_path, commit_id).to_string()])
-        .run_for_exit_code(0..=0)?;
-    Ok(())
+        .run_capture_stdio()
 }
 
 pub(crate) fn prefetch_repo(repo_root: &Path, commit_id: &str) -> eyre::Result<()> {
@@ -98,8 +97,7 @@ pub(crate) fn prefetch_repo(repo_root: &Path, commit_id: &str) -> eyre::Result<(
         .args(["--argstr", "repoRoot"])
         .arg(repo_root)
         .args(["--argstr", "rev", commit_id])
-        .run_for_exit_code(0..=0)?;
-    Ok(())
+        .run_capture_stdio()
 }
 
 pub(crate) fn get_drv_path(

@@ -70,6 +70,11 @@ impl Cmd {
         Ok(())
     }
 
+    pub(crate) fn run_capture_stdio(&mut self) -> eyre::Result<()> {
+        let _: Output = self.get_output(0..=0)?;
+        Ok(())
+    }
+
     pub(crate) fn run_for_exit_code(
         &mut self,
         allowed_exit_codes: impl RangeBounds<i32>,
