@@ -36,6 +36,10 @@ impl Cmd {
         Self::new("git")
     }
 
+    pub(crate) fn jj() -> Self {
+        Self::new("jj")
+    }
+
     pub(crate) fn nix_diff() -> Self {
         Self::new("nix-diff")
     }

@@ -9,7 +9,7 @@ use crate::{
     eval, nix,
     source::Source,
     summary::EvalResultCmp,
-    vcs::{Repository, Revision},
+    vcs::{Repository, Revision, VcsMode},
 };
 
 const AFTER_HELP: &str = "\
@@ -34,22 +34,23 @@ pub struct NdfApp {
     ///
     /// The special value `[working tree]` means "the Git working tree".
     ///
-    /// If none of `--to` or `--base` is provided, then the default is:
-    /// - `HEAD~`, if the working tree is clean
-    /// - `HEAD`, if there are uncommitted changes
+    /// If none of `--to` or `--base` is provided,
+    /// then the default is (for Git/Jujutsu modes respectively)
+    /// `HEAD~`/`@--` if the working tree is clean,
+    /// and `HEAD`/`@-` if there are uncommitted changes.
     ///
     /// If one of `--to` or `--base` is provided, then the default is the same as for `--to`.
-    #[arg(short = 'f', long, verbatim_doc_comment)]
+    #[arg(short = 'f', long)]
     from: Option<String>,
 
     /// Report changes to this revision.
     ///
     /// The special value `[working tree]` means "the Git working tree".
     ///
-    /// The default is:
-    /// - `HEAD`, if the working tree is clean
-    /// - `[working tree]`, if there are uncommitted changes
-    #[arg(short = 't', long, verbatim_doc_comment)]
+    /// The default is (for Git/Jujutsu modes respectively)
+    /// `HEAD`/`@-` if the working tree is clean,
+    /// and `[working tree]`/`@` if there are uncommitted changes.
+    #[arg(short = 't', long)]
     to: Option<String>,
 
     /// Compare all other attribute paths to this one.
@@ -109,6 +110,18 @@ pub struct NdfApp {
         verbatim_doc_comment,
     )]
     tool_extra_args: Option<Vec<String>>,
+
+    /// Use Git to parse and display revisions (Git mode).
+    ///
+    /// The default is `--jj` if the repository root contains a `.jj` entry, and `--git` otherwise.
+    #[arg(long)]
+    git: bool,
+
+    /// Use Jujutsu to parse and display revisions (Jujutsu mode).
+    ///
+    /// The default is `--jj` if the repository root contains a `.jj` entry, and `--git` otherwise.
+    #[arg(long, conflicts_with("git"))]
+    jj: bool,
 
     /// Maximum number of Nix evaluations to perform in parallel.
     ///
@@ -195,7 +208,13 @@ impl NdfApp {
                 .wrap_err_with(|| format!("invalid value for option '--flake': {flake:?}"))?
         };
 
-        let mut repo = Repository::for_source(&source)?;
+        let vcs_mode_override = match (self.git, self.jj) {
+            (false, false) => None,
+            (true, false) => Some(VcsMode::Git),
+            (false, true) => Some(VcsMode::Jujutsu),
+            (true, true) => unreachable!("--git and --jj are mutually exclusive"),
+        };
+        let mut repo = Repository::for_source(&source, vcs_mode_override)?;
         let from = self.make_from(&mut repo)?;
         let to = self.make_to(&mut repo)?;
 
@@ -245,17 +264,13 @@ impl NdfApp {
     fn make_from(&self, repo: &mut Repository) -> eyre::Result<Revision> {
         let commit = match &self.from {
             Some(from) => from.as_str(),
-            None => match (
-                self.to.is_some() || self.base.is_some(),
-                repo.working_tree_is_clean()?,
-            ) {
-                // Same default as `--to`
-                (true, true) => "HEAD",
-                (true, false) => "[working tree]",
-                // Parent of the `--to` default
-                (false, true) => "HEAD~",
-                (false, false) => "HEAD",
-            },
+            None => {
+                if self.to.is_some() || self.base.is_some() {
+                    default_to(repo.mode(), repo.working_tree_is_clean()?)
+                } else {
+                    default_from(repo.mode(), repo.working_tree_is_clean()?)
+                }
+            }
         };
         repo.resolve_commit(commit)
     }
@@ -263,12 +278,27 @@ impl NdfApp {
     fn make_to(&self, repo: &mut Repository) -> eyre::Result<Revision> {
         let commit = match &self.to {
             Some(to) => to.as_str(),
-            None => match repo.working_tree_is_clean()? {
-                true => "HEAD",
-                false => "[working tree]",
-            },
+            None => default_to(repo.mode(), repo.working_tree_is_clean()?),
         };
         repo.resolve_commit(commit)
+    }
+}
+
+fn default_from(vcs_mode: VcsMode, working_tree_is_clean: bool) -> &'static str {
+    match (vcs_mode, working_tree_is_clean) {
+        (VcsMode::Git, true) => "HEAD~",
+        (VcsMode::Git, false) => "HEAD",
+        (VcsMode::Jujutsu, true) => "@--",
+        (VcsMode::Jujutsu, false) => "@-",
+    }
+}
+
+fn default_to(vcs_mode: VcsMode, working_tree_is_clean: bool) -> &'static str {
+    match (vcs_mode, working_tree_is_clean) {
+        (VcsMode::Git, true) => "HEAD",
+        (VcsMode::Git, false) => "[working tree]",
+        (VcsMode::Jujutsu, true) => "@-",
+        (VcsMode::Jujutsu, false) => "@",
     }
 }
 

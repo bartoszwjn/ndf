@@ -1,36 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use eyre::{WrapErr, bail};
+use eyre::bail;
 
 use crate::command::Cmd;
-
-pub(super) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
-    assert!(path_in_repo.is_absolute());
-
-    let mut path = path_in_repo.to_owned();
-    let metadata = path
-        .metadata()
-        .wrap_err_with(|| format!("failed to query metadata of {path:?}"))?;
-    if metadata.is_file() {
-        path.pop();
-    }
-    loop {
-        path.push(".git");
-        let has_dot_git = path
-            .try_exists()
-            .wrap_err_with(|| format!("failed to check for existence of {path:?}"))?;
-        path.pop();
-        if has_dot_git {
-            return Ok(path);
-        }
-
-        if &path == "/" {
-            bail!("path {path_in_repo:?} is not part of a Git repository");
-        }
-
-        path.pop();
-    }
-}
 
 pub(super) fn working_tree_is_clean(worktree_root: &Path) -> eyre::Result<bool> {
     let exit_code = Cmd::git()
@@ -39,6 +11,7 @@ pub(super) fn working_tree_is_clean(worktree_root: &Path) -> eyre::Result<bool> 
         .args(["--git-dir", ".git"])
         .args(["diff", "--quiet", "HEAD"])
         .run_for_exit_code(0..=1)?;
+
     Ok(exit_code == 0)
 }
 
@@ -49,6 +22,7 @@ pub(super) fn resolve_commit(commit: &str, worktree_root: &Path) -> eyre::Result
         .args(["--git-dir", ".git"])
         .args(["rev-parse", "--verify", "--end-of-options", commit])
         .output_string()?;
+
     strip_trailing_newline(&mut output)?;
 
     if output.len() != 40 {
@@ -80,14 +54,18 @@ pub(super) fn show_commit(commit_id: &str, worktree_root: &Path) -> eyre::Result
             commit_id,
         ])
         .output_string()?;
+
     strip_trailing_newline(&mut output)?;
 
     Ok(output)
 }
 
 fn strip_trailing_newline(git_output: &mut String) -> eyre::Result<()> {
-    match git_output.pop() {
-        Some('\n') => Ok(()),
-        _ => bail!("expected 'git' command output to end with a newline, got {git_output:?}"),
+    match git_output.strip_suffix('\n') {
+        Some(rest) => {
+            git_output.truncate(rest.len());
+            Ok(())
+        }
+        None => bail!("expected 'git' command output to end with a newline, got {git_output:?}"),
     }
 }

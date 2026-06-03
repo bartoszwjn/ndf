@@ -22,10 +22,12 @@ nix run github:bartoszwjn/ndf
 
 `cargo install --git` should work as well.
 
-The program expects `nix` (as well as `nix-instantiate`, `nix-build`, etc.)
-and `git` commands to be available in `PATH` at runtime.
-When using external tools to compare derivations (the `--tool` option)
-those tools need to be available in `PATH` as well.
+The program expects the following commands to be available in `PATH` at runtime:
+
+- `nix`, as well as `nix-instantiate`, `nix-build`, etc.
+- `git`, if operating on a pure Git repository.
+- `jj`, if operating on a colocated Jujutsu/Git repository.
+- The external tool used to compare derivations, if specified using the `--tool` option.
 
 ## Usage
 
@@ -38,14 +40,22 @@ Use positional arguments to manually specify which output attributes to compare.
 
 See the `--help` output for details about all command line flags and options.
 
+`ndf` has special support for [Jujutsu workspaces][jj].
+When `ndf` detects that the given repository is a Jujutsu workspace it switches to "Jujutsu mode",
+in which revisions are specified using Jujutsu's [revset language][jj-revsets]
+and `jj log` is used to display them.
+The Jujutsu workspace must be a [colocated Jujutsu/Git workspace][jj-colocated-workspaces],
+since Nix does not integrate with Jujutsu directly.
+The automatic mode selection can be overridden using the `--git` and `--jj` flags.
+
 ## Roadmap
 
 Planned changes:
 
 - Add `--glob` flag to allow using glob patterns in attribute paths.
-- [Jujutsu] support: detect colocated Jujutsu/Git repositories, display commits using `jj log`,
-  allow selecting commits using `jj`'s revset language.
 
-[Jujutsu]: https://www.jj-vcs.dev
 [Worry-free NixOS refactors]: https://www.tweag.io/blog/2022-10-11-stable-narhashes/
 [`nix-diff`]: https://github.com/Gabriella439/nix-diff/
+[jj-colocated-workspaces]: https://www.jj-vcs.dev/latest/glossary/#colocated-workspaces
+[jj-revsets]: https://www.jj-vcs.dev/latest/revsets/
+[jj]: https://www.jj-vcs.dev
