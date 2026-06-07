@@ -4,7 +4,7 @@ use eyre::{WrapErr, bail};
 
 use crate::command::Cmd;
 
-pub(crate) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
+pub(super) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
     assert!(path_in_repo.is_absolute());
 
     let mut path = path_in_repo.to_owned();
@@ -32,7 +32,7 @@ pub(crate) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
     }
 }
 
-pub(crate) fn working_tree_is_clean(repo_root: &Path) -> eyre::Result<bool> {
+pub(super) fn working_tree_is_clean(repo_root: &Path) -> eyre::Result<bool> {
     let exit_code = Cmd::git()
         .arg("-C")
         .arg(repo_root)
@@ -42,7 +42,7 @@ pub(crate) fn working_tree_is_clean(repo_root: &Path) -> eyre::Result<bool> {
     Ok(exit_code == 0)
 }
 
-pub(crate) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<String> {
+pub(super) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
         .arg("-C")
         .arg(repo_root)
@@ -64,7 +64,7 @@ pub(crate) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<Str
     Ok(output)
 }
 
-pub(crate) fn show_commit(commit_id: &str, repo_root: &Path) -> eyre::Result<String> {
+pub(super) fn show_commit(commit_id: &str, repo_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
         .arg("-C")
         .arg(repo_root)

@@ -3,7 +3,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{git, source::Source};
+use crate::source::Source;
+
+mod git;
 
 #[derive(Debug)]
 pub(crate) struct Repository {
