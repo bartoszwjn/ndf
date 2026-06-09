@@ -1,5 +1,5 @@
 [command]
-args = ["--to=@", "--impure"]
+args = ["--impure"]
 env.NDF_TESTS_NIX_PKG_NAME = "from-env"
 
 [repo_contents]
@@ -28,7 +28,7 @@ stdout = """
 Flake: @REPO@ (impure)
 Repo:  @REPO@
 From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
-To:    @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
 Attribute paths:
   pkg-from-env
 

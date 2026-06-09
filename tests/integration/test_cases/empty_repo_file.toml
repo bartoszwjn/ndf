@@ -7,10 +7,6 @@ args = ["--file", "."]
 message = "commit 1"
 files = {}
 
-[[repo_contents.commits]]
-message = "commit 2"
-files = {}
-
 [outputs]
 exit_code = 2
 stdout = ""

@@ -23,31 +23,13 @@ files."flake.nix" = """
 }
 """
 
-[[repo_contents.commits]]
-message = "commit 2"
-files."flake.nix" = """
-{
-  outputs =
-    inputs:
-    let
-      drv = import ./drv.nix;
-    in
-    {
-      packages.@SYSTEM@ = {
-        "" = drv "empty";
-        foo."".bar = drv "foobar";
-      };
-    };
-}
-"""
-
 [outputs]
 exit_code = 0
 stdout = """
 Flake: @REPO@
 Repo:  @REPO@
-From:  @COMMIT_1_SHORT_ID@ commit 1
-To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
 Attribute paths:
   ""
   foo."".bar

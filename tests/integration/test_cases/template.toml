@@ -30,31 +30,6 @@ files."flake.nix" = """
 }
 """
 
-[[repo_contents.commits]]
-message = "commit 2"
-files."default.nix" = """
-let
-  drv = import ./drv.nix;
-in
-{
-  TODO
-}
-"""
-files."flake.nix" = """
-{
-  outputs =
-    inputs:
-    let
-      drv = import ./drv.nix;
-    in
-    {
-      packages.@SYSTEM@ = {
-        TODO
-      };
-    };
-}
-"""
-
 [outputs]
 exit_code = 42
 stdout = ""

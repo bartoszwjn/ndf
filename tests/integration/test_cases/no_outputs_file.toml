@@ -9,19 +9,13 @@ files."empty.nix" = """
 {}
 """
 
-[[repo_contents.commits]]
-message = "commit 2"
-files."empty.nix" = """
-{}
-"""
-
 [outputs]
 exit_code = 0
 stdout = """
 File:  @REPO@/empty.nix
 Repo:  @REPO@
-From:  @COMMIT_1_SHORT_ID@ commit 1
-To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
 Attribute paths:
 
 Summary:

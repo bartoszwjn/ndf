@@ -17,27 +17,13 @@ in
 }
 """
 
-[[repo_contents.commits]]
-message = "commit 2"
-files."weird.nix" = """
-let
-  drv = import ./drv.nix;
-in
-{
-  normal = drv "normal";
-  "with whitespace" = drv "whitespace";
-  "with.dots.tld" = drv "dots";
-  "with\\"quotes\\"" = drv "quotes";
-}
-"""
-
 [outputs]
 exit_code = 0
 stdout = """
 File:  @REPO@/weird.nix
 Repo:  @REPO@
-From:  @COMMIT_1_SHORT_ID@ commit 1
-To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
 Attribute paths:
   normal
   "with whitespace"

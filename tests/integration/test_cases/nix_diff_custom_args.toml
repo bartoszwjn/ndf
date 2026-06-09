@@ -20,8 +20,7 @@ in
 }
 """
 
-[[repo_contents.commits]]
-message = "commit 2"
+[repo_contents.index]
 files."default.nix" = """
 let
   drv = import ./drv.nix;
@@ -36,14 +35,14 @@ exit_code = 1
 stdout = """
 File:  @REPO@/default.nix
 Repo:  @REPO@
-From:  @COMMIT_1_SHORT_ID@ commit 1
-To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
 Tool:  nix-diff --skip-already-compared --word-oriented
 Attribute paths:
   pkg1
 
-- pkg1 @COMMIT_1_SHORT_ID@ commit 1
-+ pkg1 @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+- pkg1 @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
++ pkg1 [working tree]
 - /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv:{out}
 + /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv:{out}
 • The environments do not match:

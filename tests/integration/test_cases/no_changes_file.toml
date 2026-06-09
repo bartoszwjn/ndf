@@ -16,26 +16,13 @@ in
 }
 """
 
-[[repo_contents.commits]]
-message = "commit 2"
-files."default.nix" = """
-let
-  drv = import ./drv.nix;
-in
-{
-  pkg1 = drv "pkg1";
-  pkg2 = drv "pkg2";
-  pkg3 = drv "pkg3";
-}
-"""
-
 [outputs]
 exit_code = 0
 stdout = """
 File:  @REPO@/default.nix
 Repo:  @REPO@
-From:  @COMMIT_1_SHORT_ID@ commit 1
-To:    @COMMIT_2_SHORT_ID@ (HEAD -> main) commit 2
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
 Attribute paths:
   pkg1
   pkg2

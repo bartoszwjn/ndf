@@ -1,5 +1,5 @@
 [command]
-args = ["--to=@", "-j1"] # `-j1` for deterministic order of logs
+args = ["-j1"] # `-j1` for deterministic order of logs
 
 [repo_contents]
 
@@ -27,7 +27,7 @@ stdout = """
 Flake: @REPO@
 Repo:  @REPO@
 From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
-To:    @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
 Attribute paths:
   set
   set-with-_type
@@ -54,12 +54,22 @@ Summary:
 stderr = """
 ERROR eval_drv_path{attr_path=set commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got set
+ERROR eval_drv_path{attr_path=set}: 
+   0: expected a derivation, got set
 ERROR eval_drv_path{attr_path=set-with-_type commit_id="@COMMIT_1_ID@"}: 
+   0: expected a derivation, got set (with _type = fileset)
+ERROR eval_drv_path{attr_path=set-with-_type}: 
    0: expected a derivation, got set (with _type = fileset)
 ERROR eval_drv_path{attr_path=set-with-type commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got set (with type = configuration)
+ERROR eval_drv_path{attr_path=set-with-type}: 
+   0: expected a derivation, got set (with type = configuration)
 ERROR eval_drv_path{attr_path=set-with-types commit_id="@COMMIT_1_ID@"}: 
    0: expected a derivation, got set (with type = primary)
+ERROR eval_drv_path{attr_path=set-with-types}: 
+   0: expected a derivation, got set (with type = primary)
 ERROR eval_drv_path{attr_path=string commit_id="@COMMIT_1_ID@"}: 
+   0: expected a derivation, got string
+ERROR eval_drv_path{attr_path=string}: 
    0: expected a derivation, got string
 """
