@@ -32,18 +32,23 @@ pub struct NdfApp {
 
     /// Report changes from this revision.
     ///
-    /// If either of `--to` or `--base` is provided, then the default is the same as for `--to`.
+    /// The special value `[working tree]` means "the Git working tree".
+    ///
     /// If none of `--to` or `--base` is provided, then the default is:
     /// - `HEAD~`, if the working tree is clean
     /// - `HEAD`, if there are uncommitted changes
+    ///
+    /// If one of `--to` or `--base` is provided, then the default is the same as for `--to`.
     #[arg(short = 'f', long, verbatim_doc_comment)]
     from: Option<String>,
 
     /// Report changes to this revision.
     ///
+    /// The special value `[working tree]` means "the Git working tree".
+    ///
     /// The default is:
     /// - `HEAD`, if the working tree is clean
-    /// - current working tree, if there are uncommitted changes
+    /// - `[working tree]`, if there are uncommitted changes
     #[arg(short = 't', long, verbatim_doc_comment)]
     to: Option<String>,
 
@@ -239,17 +244,17 @@ impl NdfApp {
 
     fn make_from(&self, repo: &mut Repository) -> eyre::Result<Revision> {
         let commit = match &self.from {
-            Some(from) => Some(from.as_str()),
+            Some(from) => from.as_str(),
             None => match (
                 self.to.is_some() || self.base.is_some(),
                 repo.working_tree_is_clean()?,
             ) {
                 // Same default as `--to`
-                (true, true) => Some("HEAD"),
-                (true, false) => None,
+                (true, true) => "HEAD",
+                (true, false) => "[working tree]",
                 // Parent of the `--to` default
-                (false, true) => Some("HEAD~"),
-                (false, false) => Some("HEAD"),
+                (false, true) => "HEAD~",
+                (false, false) => "HEAD",
             },
         };
         repo.resolve_commit(commit)
@@ -257,10 +262,10 @@ impl NdfApp {
 
     fn make_to(&self, repo: &mut Repository) -> eyre::Result<Revision> {
         let commit = match &self.to {
-            Some(to) => Some(to.as_str()),
+            Some(to) => to.as_str(),
             None => match repo.working_tree_is_clean()? {
-                true => Some("HEAD"),
-                false => None,
+                true => "HEAD",
+                false => "[working tree]",
             },
         };
         repo.resolve_commit(commit)

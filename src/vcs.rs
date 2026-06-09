@@ -40,10 +40,16 @@ impl Repository {
         }
     }
 
-    pub(crate) fn resolve_commit(&self, commit: Option<&str>) -> eyre::Result<Revision> {
-        let Some(commit) = commit else {
+    pub(crate) fn resolve_commit(&self, commit: &str) -> eyre::Result<Revision> {
+        // NOTE: `[working tree]` should never be a valid input to `git rev-parse`,
+        // a.k.a. "extended SHA-1 syntax":
+        // https://git-scm.com/docs/git-rev-parse#_specifying_revisions
+        //
+        // Note that ref names cannot contain '[':
+        // https://git-scm.com/docs/git-check-ref-format
+        if commit == "[working tree]" {
             return Ok(Revision::GitWorkingTree);
-        };
+        }
 
         let commit_id = git::resolve_commit(commit, self.root())?;
         let display = git::show_commit(&commit_id, self.root())?;
@@ -82,7 +88,6 @@ impl fmt::Display for Revision {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::GitRevision(git_revision) => f.write_str(&git_revision.display),
-            // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
             Self::GitWorkingTree => {
                 use crate::styles::WORKING_TREE;
                 write!(f, "{WORKING_TREE}[working tree]{WORKING_TREE:#}")
