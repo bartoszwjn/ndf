@@ -32,20 +32,20 @@ pub(super) fn get_repo_root(path_in_repo: &Path) -> eyre::Result<PathBuf> {
     }
 }
 
-pub(super) fn working_tree_is_clean(repo_root: &Path) -> eyre::Result<bool> {
+pub(super) fn working_tree_is_clean(worktree_root: &Path) -> eyre::Result<bool> {
     let exit_code = Cmd::git()
         .arg("-C")
-        .arg(repo_root)
+        .arg(worktree_root)
         .args(["--git-dir", ".git"])
         .args(["diff", "--quiet", "HEAD"])
         .run_for_exit_code(0..=1)?;
     Ok(exit_code == 0)
 }
 
-pub(super) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<String> {
+pub(super) fn resolve_commit(commit: &str, worktree_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
         .arg("-C")
-        .arg(repo_root)
+        .arg(worktree_root)
         .args(["--git-dir", ".git"])
         .args(["rev-parse", "--verify", "--end-of-options", commit])
         .output_string()?;
@@ -64,10 +64,10 @@ pub(super) fn resolve_commit(commit: &str, repo_root: &Path) -> eyre::Result<Str
     Ok(output)
 }
 
-pub(super) fn show_commit(commit_id: &str, repo_root: &Path) -> eyre::Result<String> {
+pub(super) fn show_commit(commit_id: &str, worktree_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
         .arg("-C")
-        .arg(repo_root)
+        .arg(worktree_root)
         .args(["--git-dir", ".git"])
         .args([
             "show",

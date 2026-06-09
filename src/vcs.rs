@@ -11,7 +11,7 @@ mod git;
 pub(crate) struct Repository {
     /// Absolute, canonicalized path to repository root.
     root: PathBuf,
-    worktree_is_clean: Option<bool>,
+    working_tree_is_clean: Option<bool>,
 }
 
 impl Repository {
@@ -22,7 +22,7 @@ impl Repository {
         })?;
         Ok(Self {
             root,
-            worktree_is_clean: None,
+            working_tree_is_clean: None,
         })
     }
 
@@ -30,19 +30,19 @@ impl Repository {
         &self.root
     }
 
-    pub(crate) fn worktree_is_clean(&mut self) -> eyre::Result<bool> {
-        match self.worktree_is_clean {
+    pub(crate) fn working_tree_is_clean(&mut self) -> eyre::Result<bool> {
+        match self.working_tree_is_clean {
             Some(cached) => Ok(cached),
             None => {
                 let is_clean = git::working_tree_is_clean(self.root())?;
-                Ok(*self.worktree_is_clean.insert(is_clean))
+                Ok(*self.working_tree_is_clean.insert(is_clean))
             }
         }
     }
 
     pub(crate) fn resolve_commit(&self, commit: Option<&str>) -> eyre::Result<Revision> {
         let Some(commit) = commit else {
-            return Ok(Revision::GitWorktree);
+            return Ok(Revision::GitWorkingTree);
         };
 
         let commit_id = git::resolve_commit(commit, self.root())?;
@@ -60,7 +60,7 @@ impl fmt::Display for Repository {
 #[derive(Clone, Debug)]
 pub(crate) enum Revision {
     GitRevision(GitRevision),
-    GitWorktree,
+    GitWorkingTree,
 }
 
 #[derive(Clone, Debug)]
@@ -73,7 +73,7 @@ impl Revision {
     pub(crate) fn commit_id(&self) -> Option<&str> {
         match self {
             Revision::GitRevision(git_revision) => Some(&git_revision.commit_id),
-            Revision::GitWorktree => None,
+            Revision::GitWorkingTree => None,
         }
     }
 }
@@ -83,9 +83,9 @@ impl fmt::Display for Revision {
         match self {
             Self::GitRevision(git_revision) => f.write_str(&git_revision.display),
             // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
-            Self::GitWorktree => {
-                use crate::styles::WORKTREE;
-                write!(f, "{WORKTREE}[worktree]{WORKTREE:#}")
+            Self::GitWorkingTree => {
+                use crate::styles::WORKING_TREE;
+                write!(f, "{WORKING_TREE}[worktree]{WORKING_TREE:#}")
             }
         }
     }

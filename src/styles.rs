@@ -9,7 +9,7 @@ pub(crate) const IMPURE: Style = AnsiColor::Magenta.on_default();
 pub(crate) const ATTR_PATH: Style = AnsiColor::Cyan.on_default();
 pub(crate) const ATTR_PATH_QUOTED: Style = AnsiColor::Green.on_default();
 pub(crate) const ATTR_PATH_NIXOS: Style = AnsiColor::Magenta.on_default();
-pub(crate) const WORKTREE: Style = AnsiColor::Magenta.on_default();
+pub(crate) const WORKING_TREE: Style = AnsiColor::Magenta.on_default();
 
 pub(crate) const EQUAL: Style = AnsiColor::Green.on_default();
 pub(crate) const NOT_EQUAL: Style = AnsiColor::Red.on_default();

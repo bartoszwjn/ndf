@@ -31,7 +31,7 @@ those tools need to be available in `PATH` as well.
 
 Run `ndf` to compare all `packages` outputs of the Nix flake in the current directory.
 Use `--nixos` to compare `nixosConfigurations` instead.
-Use `--flake` to choose the flake to compare (must be a Git repository on the local filesystem),
+Use `--flake` to choose the flake to compare (must be a Git worktree on the local filesystem),
 `--file` to compare output attributes of a Nix expression stored in a file.
 `--from` and `--to` can be used to select commits that are compared against each other.
 Use positional arguments to manually specify which output attributes to compare.

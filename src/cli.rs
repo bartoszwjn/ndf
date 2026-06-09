@@ -43,7 +43,7 @@ pub struct NdfApp {
     ///
     /// The default is:
     /// - `HEAD`, if the working tree is clean
-    /// - current worktree, if there are uncommitted changes
+    /// - current working tree, if there are uncommitted changes
     #[arg(short = 't', long, verbatim_doc_comment)]
     to: Option<String>,
 
@@ -242,7 +242,7 @@ impl NdfApp {
             Some(from) => Some(from.as_str()),
             None => match (
                 self.to.is_some() || self.base.is_some(),
-                repo.worktree_is_clean()?,
+                repo.working_tree_is_clean()?,
             ) {
                 // Same default as `--to`
                 (true, true) => Some("HEAD"),
@@ -258,7 +258,7 @@ impl NdfApp {
     fn make_to(&self, repo: &mut Repository) -> eyre::Result<Revision> {
         let commit = match &self.to {
             Some(to) => Some(to.as_str()),
-            None => match repo.worktree_is_clean()? {
+            None => match repo.working_tree_is_clean()? {
                 true => Some("HEAD"),
                 false => None,
             },
