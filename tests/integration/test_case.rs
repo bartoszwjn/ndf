@@ -11,17 +11,20 @@ use toml_edit::DocumentMut;
 
 use crate::{
     git::{self, GitRev},
+    jj::{self, JjRev},
     nix,
 };
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct TestCase {
     command: CommandConfig,
-    repo_contents: GitRepoContents,
+    repo_contents: RepoContents,
     outputs: Outputs,
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CommandConfig {
     args: Vec<String>,
     current_dir: Option<String>,
@@ -29,23 +32,50 @@ struct CommandConfig {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+enum RepoContents {
+    Git(GitRepoContents),
+    Jj(JjRepoContents),
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct GitRepoContents {
-    commits: Vec<GitCommit>,
+    commits: Vec<Commit>,
     index: Option<GitIndex>,
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct GitCommit {
+#[serde(deny_unknown_fields)]
+struct JjRepoContents {
+    colocate: Option<bool>,
+    commits: Vec<Commit>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Commit {
     message: String,
-    files: Files,
+    parents: Option<Vec<usize>>,
+    changes: HashMap<String, Change>,
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct GitIndex {
-    files: Files,
+    parent: Option<usize>,
+    changes: HashMap<String, Change>,
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+enum Change {
+    Write(String),
+    Delete,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Outputs {
     exit_code: i32,
     stdout: String,
@@ -53,11 +83,11 @@ struct Outputs {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Common {
-    files: Files,
+    files: HashMap<String, String>,
 }
 
-type Files = HashMap<String, String>;
 type Substitutions = Vec<(String, String)>;
 
 impl TestCase {
@@ -78,10 +108,26 @@ impl TestCase {
             .join(format!("tests/integration/test_cases/{name}.toml"));
         let test_case = Self::read(&config_path, &substitutions)?;
 
-        let commits = test_case.repo_contents.create(&dir, &common.files)?;
-        for (commit_ix, commit) in commits.into_iter().enumerate() {
-            substitutions.push((format!("@COMMIT_{commit_ix}_ID@"), commit.id));
-            substitutions.push((format!("@COMMIT_{commit_ix}_SHORT_ID@"), commit.short_id));
+        match test_case.repo_contents {
+            RepoContents::Git(git_repo_contents) => {
+                let commits = git_repo_contents.create(&dir, &common)?;
+                for (ix, commit) in commits.into_iter().enumerate() {
+                    substitutions.extend([
+                        (format!("@COMMIT_{ix}_ID@"), commit.id),
+                        (format!("@COMMIT_{ix}_SHORT_ID@"), commit.short_id),
+                    ]);
+                }
+            }
+            RepoContents::Jj(jj_repo_contents) => {
+                let commits = jj_repo_contents.create(&dir, &common)?;
+                for (ix, commit) in commits.into_iter().enumerate() {
+                    substitutions.extend([
+                        (format!("@COMMIT_{ix}_LOG_ONELINE@"), commit.log_oneline),
+                        (format!("@COMMIT_{ix}_ID@"), commit.commit_id),
+                        (format!("@COMMIT_{ix}_SHORT_ID@"), commit.commit_short_id),
+                    ]);
+                }
+            }
         }
 
         let output = test_case.command.run(&dir)?;
@@ -99,14 +145,7 @@ impl TestCase {
 
     fn read(path: &Path, substitutions: &Substitutions) -> eyre::Result<Self> {
         let mut this: Self = toml::from_slice(&fs::read(path)?)?;
-
-        for commit in &mut this.repo_contents.commits {
-            substitute_files(&mut commit.files, substitutions);
-        }
-        if let Some(index) = &mut this.repo_contents.index {
-            substitute_files(&mut index.files, substitutions);
-        }
-
+        this.repo_contents.substitute(substitutions);
         Ok(this)
     }
 }
@@ -137,50 +176,121 @@ impl CommandConfig {
     }
 }
 
+impl RepoContents {
+    fn substitute(&mut self, substitutions: &Substitutions) {
+        match self {
+            RepoContents::Git(git_repo_contents) => {
+                for commit in &mut git_repo_contents.commits {
+                    for change in commit.changes.values_mut() {
+                        change.substitute(substitutions);
+                    }
+                }
+                if let Some(index) = &mut git_repo_contents.index {
+                    for change in index.changes.values_mut() {
+                        change.substitute(substitutions);
+                    }
+                }
+            }
+            RepoContents::Jj(jj_repo_contents) => {
+                for commit in &mut jj_repo_contents.commits {
+                    for change in commit.changes.values_mut() {
+                        change.substitute(substitutions);
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl GitRepoContents {
-    fn create(&self, dir: &Path, common_files: &Files) -> eyre::Result<Vec<GitRev>> {
+    fn create(&self, dir: &Path, common: &Common) -> eyre::Result<Vec<GitRev>> {
         let mut commits = Vec::new();
 
-        commits.push(git::init(dir)?);
+        git::init(dir)?;
+        for (file_name, contents) in &common.files {
+            write_file(dir, file_name, contents)?;
+        }
+        commits.push(git::commit(dir, "initial commit")?);
+
         for commit in &self.commits {
-            Self::clear_dir(dir)?;
-            for (file_name, contents) in common_files.iter().chain(commit.files.iter()) {
-                Self::write_file(dir, file_name, contents)?;
+            if let Some(parents) = &commit.parents {
+                assert!(!parents.is_empty());
+                if parents.len() == 1 {
+                    git::switch(dir, commits[parents[0]].id.as_str())?;
+                } else {
+                    git::merge(dir, parents.iter().map(|&ix| commits[ix].id.as_str()))?;
+                }
+            }
+            for (file_name, change) in &commit.changes {
+                change.apply(dir, file_name)?;
             }
             commits.push(git::commit(dir, &commit.message)?);
         }
+
         if let Some(index) = &self.index {
-            Self::clear_dir(dir)?;
-            for (file_name, contents) in common_files.iter().chain(index.files.iter()) {
-                Self::write_file(dir, file_name, contents)?;
+            if let Some(parent) = index.parent {
+                git::switch(dir, &commits[parent].id)?;
+            }
+            for (file_name, change) in &index.changes {
+                change.apply(dir, file_name)?;
             }
             git::add(dir)?;
         }
 
         Ok(commits)
     }
+}
 
-    fn clear_dir(dir: &Path) -> eyre::Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            if entry.file_name() != ".git" {
-                if entry.file_type()?.is_dir() {
-                    fs::remove_dir_all(entry.path())?;
-                } else {
-                    fs::remove_file(entry.path())?;
-                }
-            }
+impl JjRepoContents {
+    fn create(&self, dir: &Path, common: &Common) -> eyre::Result<Vec<JjRev>> {
+        let mut commits = Vec::new();
+
+        jj::init(dir, self.colocate.unwrap_or(true))?;
+
+        jj::new(dir, "initial commit", [])?;
+        for (file_name, contents) in &common.files {
+            write_file(dir, file_name, contents)?;
         }
-        Ok(())
+        commits.push(jj::get_rev(dir)?);
+
+        for commit in &self.commits {
+            match commit.parents.as_deref() {
+                None => jj::new(dir, &commit.message, [])?,
+                Some([]) => panic!(
+                    "commit {:?} has 0 parents, which is not allowed",
+                    commit.message
+                ),
+                Some(parents @ &[_, ..]) => jj::new(
+                    dir,
+                    &commit.message,
+                    parents.iter().map(|&ix| commits[ix].commit_id.as_str()),
+                )?,
+            }
+            for (file_name, change) in &commit.changes {
+                change.apply(dir, file_name)?;
+            }
+            commits.push(jj::get_rev(dir)?);
+        }
+
+        Ok(commits)
+    }
+}
+
+impl Change {
+    fn substitute(&mut self, substitutions: &Substitutions) {
+        match self {
+            Self::Write(contents) => {
+                *contents = substitute_string(std::mem::take(contents), substitutions);
+            }
+            Self::Delete => {}
+        }
     }
 
-    fn write_file(dir: &Path, file_name: &str, contents: &str) -> eyre::Result<()> {
-        let path = dir.join(file_name);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+    fn apply(&self, dir: &Path, file_name: &str) -> eyre::Result<()> {
+        match self {
+            Change::Write(contents) => write_file(dir, file_name, contents),
+            Change::Delete => fs::remove_file(dir.join(file_name)).map_err(Into::into),
         }
-        fs::write(&path, contents)?;
-        Ok(())
     }
 }
 
@@ -263,15 +373,20 @@ impl Common {
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/integration/test_cases/common.toml");
         let mut this: Self = toml::from_slice(&fs::read(&path)?)?;
-        substitute_files(&mut this.files, substitutions);
+        for file in this.files.values_mut() {
+            *file = substitute_string(std::mem::take(file), substitutions);
+        }
         Ok(this)
     }
 }
 
-fn substitute_files(files: &mut Files, substitutions: &Substitutions) {
-    for file in files.values_mut() {
-        *file = substitute_string(std::mem::take(file), substitutions);
+fn write_file(dir: &Path, file_name: &str, contents: &str) -> eyre::Result<()> {
+    let path = dir.join(file_name);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
     }
+    fs::write(&path, contents)?;
+    Ok(())
 }
 
 fn substitute_string(s: impl Into<String>, substitutions: &Substitutions) -> String {

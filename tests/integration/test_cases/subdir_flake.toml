@@ -1,11 +1,11 @@
 [command]
 args = ["--flake", "./in/a/subdir"]
 
-[repo_contents]
+[repo_contents.git]
 
-[[repo_contents.commits]]
+[[repo_contents.git.commits]]
 message = "commit 1"
-files."in/a/subdir/flake.nix" = """
+changes."in/a/subdir/flake.nix".write = """
 {
   outputs =
     inputs:

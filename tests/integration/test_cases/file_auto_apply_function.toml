@@ -1,11 +1,11 @@
 [command]
 args = ["--file", "fn.nix"]
 
-[repo_contents]
+[repo_contents.git]
 
-[[repo_contents.commits]]
+[[repo_contents.git.commits]]
 message = "commit 1"
-files."fn.nix" = """
+changes."fn.nix".write = """
 { version ? "1" }:
 let
   drv = import ./drv.nix;
@@ -16,8 +16,8 @@ in
 }
 """
 
-[repo_contents.index]
-files."fn.nix" = """
+[repo_contents.git.index]
+changes."fn.nix".write = """
 { version ? "2" }:
 let
   drv = import ./drv.nix;

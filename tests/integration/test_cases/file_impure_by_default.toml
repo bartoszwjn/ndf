@@ -2,11 +2,11 @@
 args = ["--file", "."]
 env.NDF_TESTS_NIX_PKG_NAME = "from-env"
 
-[repo_contents]
+[repo_contents.git]
 
-[[repo_contents.commits]]
+[[repo_contents.git.commits]]
 message = "commit 1"
-files."default.nix" = """
+changes."default.nix".write = """
 let
   drv = import ./drv.nix;
   pkgName = builtins.getEnv "NDF_TESTS_NIX_PKG_NAME";

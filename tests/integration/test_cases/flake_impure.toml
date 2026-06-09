@@ -2,11 +2,11 @@
 args = ["--impure"]
 env.NDF_TESTS_NIX_PKG_NAME = "from-env"
 
-[repo_contents]
+[repo_contents.git]
 
-[[repo_contents.commits]]
+[[repo_contents.git.commits]]
 message = "commit 1"
-files."flake.nix" = """
+changes."flake.nix".write = """
 {
   outputs =
     inputs:

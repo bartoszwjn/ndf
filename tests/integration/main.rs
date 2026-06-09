@@ -2,7 +2,9 @@ use std::sync::Once;
 
 use crate::test_case::TestCase;
 
+mod command;
 mod git;
+mod jj;
 mod nix;
 mod test_case;
 

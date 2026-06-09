@@ -1,11 +1,11 @@
 [command]
 args = ["--file", "manual-selection.nix", "a.pkg2", "pkg1", "a.b.c.d.pkg3"]
 
-[repo_contents]
+[repo_contents.git]
 
-[[repo_contents.commits]]
+[[repo_contents.git.commits]]
 message = "commit 1"
-files."manual-selection.nix" = """
+changes."manual-selection.nix".write = """
 let
   drv = import ./drv.nix;
 in

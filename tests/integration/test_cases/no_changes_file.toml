@@ -1,11 +1,11 @@
 [command]
 args = ["--file", "."]
 
-[repo_contents]
+[repo_contents.git]
 
-[[repo_contents.commits]]
+[[repo_contents.git.commits]]
 message = "commit 1"
-files."default.nix" = """
+changes."default.nix".write = """
 let
   drv = import ./drv.nix;
 in
