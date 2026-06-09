@@ -23,37 +23,54 @@ const AFTER_HELP: &str = "\
 pub struct NdfApp {
     /// Attribute paths to compare.
     ///
-    /// Each path is compared between the revisions specified with `--from` and `--to`.
+    /// Each path is compared between revisions specified with `-r`, or `-f` and `-t`.
     ///
     /// By default, these paths are interpreted as flake output attributes
     /// of the flake in the current working directory.
     #[arg(value_name = "ATTR_PATH")]
     attr_paths: Vec<String>,
 
+    /// Report changes for this revision.
+    ///
+    /// If `--base` is not provided, show changes in this revision compared to its first parent.
+    /// If `--base` is provided, use this revision on both sides of the comparison.
+    ///
+    /// The special value `[working tree]` means "the Git working tree" (Git mode only).
+    /// With `-r [working tree]` and no `--base`, the working tree is compared to `HEAD`.
+    ///
+    /// If none of `-r`, `-f`, or `-t` is provided,
+    /// then the default is `-r [working tree]` in Git mode and `-r @` in Jujutsu mode.
+    #[arg(long, short = 'r')]
+    revision: Option<String>,
+
     /// Report changes from this revision.
     ///
-    /// The special value `[working tree]` means "the Git working tree".
+    /// The special value `[working tree]` means "the Git working tree" (Git mode only).
     ///
-    /// If none of `--to` or `--base` is provided,
-    /// then the default is (for Git/Jujutsu modes respectively)
-    /// `HEAD~`/`@--` if the working tree is clean,
-    /// and `HEAD`/`@-` if there are uncommitted changes.
+    /// If none of `-r`, `-f`, or `-t` is provided,
+    /// then the default is `-r [working tree]` in Git mode and `-r @` in Jujutsu mode.
     ///
-    /// If one of `--to` or `--base` is provided, then the default is the same as for `--to`.
-    #[arg(short = 'f', long)]
+    /// If `-t` is provided then the default for `-f` is
+    /// `[working tree]` in Git mode and `@` in Jujutsu mode.
+    #[arg(long, short = 'f', conflicts_with("revision"))]
     from: Option<String>,
 
     /// Report changes to this revision.
     ///
-    /// The special value `[working tree]` means "the Git working tree".
+    /// The special value `[working tree]` means "the Git working tree" (Git mode only).
     ///
-    /// The default is (for Git/Jujutsu modes respectively)
-    /// `HEAD`/`@-` if the working tree is clean,
-    /// and `[working tree]`/`@` if there are uncommitted changes.
-    #[arg(short = 't', long)]
+    /// If none of `-r`, `-f`, or `-t` is provided,
+    /// then the default is `-r [working tree]` in Git mode and `-r @` in Jujutsu mode.
+    ///
+    /// If `-f` is provided then the default for `-t` is
+    /// `[working tree]` in Git mode and `@` in Jujutsu mode.
+    #[arg(long, short = 't', conflicts_with("revision"))]
     to: Option<String>,
 
     /// Compare all other attribute paths to this one.
+    ///
+    /// Each comparison will use this attribute path
+    /// on the side corresponding to the `--from` revision.
     #[arg(long)]
     base: Option<String>,
 
@@ -214,9 +231,8 @@ impl NdfApp {
             (false, true) => Some(VcsMode::Jujutsu),
             (true, true) => unreachable!("--git and --jj are mutually exclusive"),
         };
-        let mut repo = Repository::for_source(&source, vcs_mode_override)?;
-        let from = self.make_from(&mut repo)?;
-        let to = self.make_to(&mut repo)?;
+        let repo = Repository::for_source(&source, vcs_mode_override)?;
+        let (from, to) = self.make_from_and_to(&repo)?;
 
         let tool_extra_args = self
             .tool_extra_args
@@ -261,44 +277,32 @@ impl NdfApp {
         })
     }
 
-    fn make_from(&self, repo: &mut Repository) -> eyre::Result<Revision> {
-        let commit = match &self.from {
-            Some(from) => from.as_str(),
-            None => {
-                if self.to.is_some() || self.base.is_some() {
-                    default_to(repo.mode(), repo.working_tree_is_clean()?)
+    fn make_from_and_to(&self, repo: &Repository) -> eyre::Result<(Revision, Revision)> {
+        let default_rev = match repo.mode() {
+            VcsMode::Git => "[working tree]",
+            VcsMode::Jujutsu => "@",
+        };
+        match (&self.revision, &self.from, &self.to) {
+            (revision, None, None) => {
+                let rev = revision.as_deref().unwrap_or(default_rev);
+                if self.base.is_none() {
+                    let to = repo.resolve_commit(rev)?;
+                    let from = repo.get_first_parent(&to)?;
+                    Ok((from, to))
                 } else {
-                    default_from(repo.mode(), repo.working_tree_is_clean()?)
+                    let from_and_to = repo.resolve_commit(rev)?;
+                    Ok((from_and_to.clone(), from_and_to))
                 }
             }
-        };
-        repo.resolve_commit(commit)
-    }
-
-    fn make_to(&self, repo: &mut Repository) -> eyre::Result<Revision> {
-        let commit = match &self.to {
-            Some(to) => to.as_str(),
-            None => default_to(repo.mode(), repo.working_tree_is_clean()?),
-        };
-        repo.resolve_commit(commit)
-    }
-}
-
-fn default_from(vcs_mode: VcsMode, working_tree_is_clean: bool) -> &'static str {
-    match (vcs_mode, working_tree_is_clean) {
-        (VcsMode::Git, true) => "HEAD~",
-        (VcsMode::Git, false) => "HEAD",
-        (VcsMode::Jujutsu, true) => "@--",
-        (VcsMode::Jujutsu, false) => "@-",
-    }
-}
-
-fn default_to(vcs_mode: VcsMode, working_tree_is_clean: bool) -> &'static str {
-    match (vcs_mode, working_tree_is_clean) {
-        (VcsMode::Git, true) => "HEAD",
-        (VcsMode::Git, false) => "[working tree]",
-        (VcsMode::Jujutsu, true) => "@-",
-        (VcsMode::Jujutsu, false) => "@",
+            (None, from, to) => {
+                let from = from.as_deref().unwrap_or(default_rev);
+                let to = to.as_deref().unwrap_or(default_rev);
+                Ok((repo.resolve_commit(from)?, repo.resolve_commit(to)?))
+            }
+            (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
+                unreachable!("--revision is mutually exclusive with --from and --to")
+            }
+        }
     }
 }
 

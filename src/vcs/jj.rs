@@ -13,18 +13,6 @@ pub(super) fn git_import(workspace_root: &Path) -> eyre::Result<()> {
         .run_capture_stdio()
 }
 
-pub(super) fn working_copy_commit_is_empty(workspace_root: &Path) -> eyre::Result<bool> {
-    Cmd::jj()
-        .arg("--repository")
-        .arg(workspace_root)
-        .arg("--ignore-working-copy")
-        .arg("log")
-        .arg("--no-graph")
-        .args(["--template", "if(empty, 'true', 'false')"])
-        .args(["--revision", "exactly(@, 1)"])
-        .output_json::<bool>()
-}
-
 pub(super) fn resolve_and_show_commit(
     commit: &str,
     workspace_root: &Path,

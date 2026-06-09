@@ -4,17 +4,6 @@ use eyre::bail;
 
 use crate::command::Cmd;
 
-pub(super) fn working_tree_is_clean(worktree_root: &Path) -> eyre::Result<bool> {
-    let exit_code = Cmd::git()
-        .arg("-C")
-        .arg(worktree_root)
-        .args(["--git-dir", ".git"])
-        .args(["diff", "--quiet", "HEAD"])
-        .run_for_exit_code(0..=1)?;
-
-    Ok(exit_code == 0)
-}
-
 pub(super) fn resolve_commit(commit: &str, worktree_root: &Path) -> eyre::Result<String> {
     let mut output = Cmd::git()
         .arg("-C")

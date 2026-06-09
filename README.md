@@ -35,7 +35,7 @@ Run `ndf` to compare all `packages` outputs of the Nix flake in the current dire
 Use `--nixos` to compare `nixosConfigurations` instead.
 Use `--flake` to choose the flake to compare (must be a Git worktree on the local filesystem),
 `--file` to compare output attributes of a Nix expression stored in a file.
-`--from` and `--to` can be used to select commits that are compared against each other.
+`--revision`, `--from` and `--to` can be used to select commits that are compared to each other.
 Use positional arguments to manually specify which output attributes to compare.
 
 See the `--help` output for details about all command line flags and options.

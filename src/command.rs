@@ -1,7 +1,6 @@
 use std::{
     ffi::OsStr,
     fmt,
-    ops::RangeBounds,
     process::{Command, Output, Stdio},
 };
 
@@ -70,28 +69,17 @@ impl Cmd {
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
-            .get_output(0..=0)?;
+            .get_output()?;
         Ok(())
     }
 
     pub(crate) fn run_capture_stdio(&mut self) -> eyre::Result<()> {
-        let _: Output = self.get_output(0..=0)?;
+        let _: Output = self.get_output()?;
         Ok(())
     }
 
-    pub(crate) fn run_for_exit_code(
-        &mut self,
-        allowed_exit_codes: impl RangeBounds<i32>,
-    ) -> eyre::Result<i32> {
-        let output = self.get_output(allowed_exit_codes)?;
-        Ok(output
-            .status
-            .code()
-            .expect("exit code is in allowed range, so it's not None"))
-    }
-
     pub(crate) fn output_string(&mut self) -> eyre::Result<String> {
-        let mut output = self.get_output(0..=0)?;
+        let mut output = self.get_output()?;
         match String::from_utf8(output.stdout) {
             Ok(string) => Ok(string),
             Err(error) => {
@@ -109,7 +97,7 @@ impl Cmd {
     }
 
     pub(crate) fn output_json<T: DeserializeOwned>(&mut self) -> eyre::Result<T> {
-        let output = self.get_output(0..=0)?;
+        let output = self.get_output()?;
         self.add_error_context(
             Some(&output),
             serde_json::from_slice(&output.stdout).wrap_err_with(|| {
@@ -121,7 +109,7 @@ impl Cmd {
         )
     }
 
-    fn get_output(&mut self, allowed_exit_codes: impl RangeBounds<i32>) -> eyre::Result<Output> {
+    fn get_output(&mut self) -> eyre::Result<Output> {
         trace_program(&self.inner);
         let result = self.inner.output();
         let output = self.add_error_context(
@@ -134,11 +122,7 @@ impl Cmd {
             }),
         )?;
 
-        let success = output
-            .status
-            .code()
-            .is_some_and(|code| allowed_exit_codes.contains(&code));
-        if !success {
+        if !output.status.success() {
             return self.add_error_context(
                 Some(&output),
                 Err(eyre!(

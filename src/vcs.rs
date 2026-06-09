@@ -22,7 +22,6 @@ pub(crate) struct Repository {
     /// Absolute, canonicalized path to repository root.
     root: PathBuf,
     mode: VcsMode,
-    working_tree_is_clean: Option<bool>,
 }
 
 impl Repository {
@@ -38,11 +37,7 @@ impl Repository {
         if let VcsMode::Jujutsu = mode {
             jj::git_import(&root)?;
         }
-        Ok(Self {
-            root,
-            mode,
-            working_tree_is_clean: None,
-        })
+        Ok(Self { root, mode })
     }
 
     pub(crate) fn root(&self) -> &Path {
@@ -51,19 +46,6 @@ impl Repository {
 
     pub(crate) fn mode(&self) -> VcsMode {
         self.mode
-    }
-
-    pub(crate) fn working_tree_is_clean(&mut self) -> eyre::Result<bool> {
-        match self.working_tree_is_clean {
-            Some(cached) => Ok(cached),
-            None => {
-                let is_clean = match self.mode {
-                    VcsMode::Git => git::working_tree_is_clean(self.root())?,
-                    VcsMode::Jujutsu => jj::working_copy_commit_is_empty(self.root())?,
-                };
-                Ok(*self.working_tree_is_clean.insert(is_clean))
-            }
-        }
     }
 
     pub(crate) fn resolve_commit(&self, commit: &str) -> eyre::Result<Revision> {
@@ -93,6 +75,18 @@ impl Repository {
                 Ok(Revision::Commit(Commit { commit_id, display }))
             }
         }
+    }
+
+    pub(crate) fn get_first_parent(&self, revision: &Revision) -> eyre::Result<Revision> {
+        let parent = match (revision, self.mode) {
+            (Revision::Commit(Commit { commit_id, .. }), VcsMode::Git) => &format!("{commit_id}^"),
+            (Revision::Commit(Commit { commit_id, .. }), VcsMode::Jujutsu) => {
+                &format!("exactly(first_parent(commit_id({commit_id})), 1)")
+            }
+            (Revision::GitWorkingTree, VcsMode::Git) => "HEAD",
+            (Revision::GitWorkingTree, VcsMode::Jujutsu) => unreachable!(),
+        };
+        self.resolve_commit(parent)
     }
 }
 
