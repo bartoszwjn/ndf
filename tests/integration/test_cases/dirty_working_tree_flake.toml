@@ -44,7 +44,7 @@ stdout = """
 Flake: @REPO@
 Repo:  @REPO@
 From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
-To:    [worktree]
+To:    [working tree]
 Attribute paths:
   pkg1
   pkg2

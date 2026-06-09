@@ -85,7 +85,7 @@ impl fmt::Display for Revision {
             // NOTE: ref names cannot contain '[', see `git check-ref-format --help`.
             Self::GitWorkingTree => {
                 use crate::styles::WORKING_TREE;
-                write!(f, "{WORKING_TREE}[worktree]{WORKING_TREE:#}")
+                write!(f, "{WORKING_TREE}[working tree]{WORKING_TREE:#}")
             }
         }
     }
