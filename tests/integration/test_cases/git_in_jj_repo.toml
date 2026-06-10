@@ -1,0 +1,40 @@
+[command]
+args = ["--file", ".", "--git"]
+
+[repo_contents.jj]
+
+[[repo_contents.jj.commits]]
+message = "commit 1"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1";
+  pkg2 = drv "pkg2";
+}
+"""
+
+[[repo_contents.jj.commits]]
+message = "commit 2"
+changes = {}
+
+[outputs]
+exit_code = 0
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD) commit 1
+To:    [working tree]
+Attribute paths:
+  pkg1
+  pkg2
+
+Summary:
+  pkg1 /nix/store/isn04dmf5r96lnv0jg1gd29cnbb5n1v6-pkg1.drv
+  ==   /nix/store/isn04dmf5r96lnv0jg1gd29cnbb5n1v6-pkg1.drv
+
+  pkg2 /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+  ==   /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+"""
+stderr = ""

@@ -1,0 +1,31 @@
+[command]
+args = ["--file", "."]
+
+[repo_contents.jj]
+colocate = false
+
+[[repo_contents.jj.commits]]
+message = "commit 1"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1-1";
+  pkg2 = drv "pkg2";
+}
+"""
+
+[[repo_contents.jj.commits]]
+message = "commit 2"
+changes = {}
+
+[outputs]
+exit_code = 2
+stdout = ""
+stderr = """
+error:
+   0: Jujutsu workspace at "@REPO@" is not a Git workspace
+
+Note: Jujutsu workspaces without Git colocation are not supported
+"""

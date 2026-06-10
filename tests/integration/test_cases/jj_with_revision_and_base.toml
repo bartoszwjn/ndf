@@ -1,0 +1,57 @@
+[command]
+args = ["--file", ".", "--revision", "@-", "--base", "base", "pkg1"]
+
+[repo_contents.jj]
+
+[[repo_contents.jj.commits]]
+message = "commit 1"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  base = drv "base-1";
+  pkg1 = drv "pkg1-1";
+}
+"""
+
+[[repo_contents.jj.commits]]
+message = "commit 2"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  base = drv "base-2";
+  pkg1 = drv "pkg1-2";
+}
+"""
+
+[[repo_contents.jj.commits]]
+message = "commit 3"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  base = drv "base-3";
+  pkg1 = drv "pkg1-3";
+}
+"""
+
+[outputs]
+exit_code = 1
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_2_LOG_ONELINE@
+To:    @COMMIT_2_LOG_ONELINE@
+Base:  base
+Attribute paths:
+  pkg1
+
+Summary:
+     base /nix/store/8asy50ga2wa4iayljnwkj3aabaik3zad-base-2.drv
+  != pkg1 /nix/store/n0gwm7slqj7f7czywhvkv5aih4ykbfnm-pkg1-2.drv
+"""
+stderr = ""

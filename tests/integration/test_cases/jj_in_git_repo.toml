@@ -1,0 +1,24 @@
+[command]
+args = ["--file", ".", "--jj"]
+
+[repo_contents.git]
+
+[[repo_contents.git.commits]]
+message = "commit 1"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1";
+  pkg2 = drv "pkg2";
+}
+"""
+
+[outputs]
+exit_code = 2
+stdout = ""
+stderr = """
+error:
+   0: Git workspace at "@REPO@" is not a Jujutsu workspace
+"""

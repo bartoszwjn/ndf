@@ -1,0 +1,55 @@
+[command]
+args = ["--file", ".", "--revision", "HEAD"]
+
+[repo_contents.git]
+
+[[repo_contents.git.commits]]
+message = "commit 1"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1-1";
+}
+"""
+
+[[repo_contents.git.commits]]
+message = "commit 2"
+parents = [0]
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1-2";
+}
+"""
+
+[[repo_contents.git.commits]]
+message = "commit 3"
+parents = [1, 2]
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1-3";
+}
+"""
+
+[outputs]
+exit_code = 1
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (main) commit 1
+To:    @COMMIT_3_SHORT_ID@ (HEAD) commit 3
+Attribute paths:
+  pkg1
+
+Summary:
+  pkg1 /nix/store/00pynf3avblabfjj19307dsdwspn5rjm-pkg1-1.drv
+  !=   /nix/store/j4vxji10npq2ldw1iax735469w0i5b0m-pkg1-3.drv
+"""
+stderr = ""
