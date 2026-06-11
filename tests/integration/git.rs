@@ -19,16 +19,7 @@ pub(crate) fn switch(dir: &Path, to: &str) -> eyre::Result<()> {
 
 pub(crate) fn commit(dir: &Path, message: &str) -> eyre::Result<GitRev> {
     add(dir)?;
-    command::run(
-        git_at(dir)
-            .args(["commit", "--allow-empty", "--message", message])
-            .envs([
-                ("GIT_AUTHOR_NAME", "nobody"),
-                ("GIT_AUTHOR_EMAIL", "nobody@example.tld"),
-                ("GIT_COMMITTER_NAME", "nobody"),
-                ("GIT_COMMITTER_EMAIL", "nobody@example.tld"),
-            ]),
-    )?;
+    command::run(git_at(dir).args(["commit", "--allow-empty", "--message", message]))?;
     let id = rev_parse(dir, ["--verify", "@"])?;
     keep(dir, &id)?;
     Ok(GitRev {
@@ -74,5 +65,11 @@ fn keep(dir: &Path, commit_id: &str) -> eyre::Result<()> {
 fn git_at(dir: &Path) -> Command {
     let mut cmd = Command::new("git");
     cmd.current_dir(dir);
+    cmd.args([
+        "-c",
+        "user.name=nobody",
+        "-c",
+        "user.email=nobody@example.tld",
+    ]);
     cmd
 }
