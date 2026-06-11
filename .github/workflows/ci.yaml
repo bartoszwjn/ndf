@@ -156,6 +156,7 @@ jobs:
           nix --extra-experimental-features "nix-command flakes" \
             profile ${{ case(matrix.nix == 'Lix', 'install', 'add') }} \
             --inputs-from . \
+            "nixpkgs#jujutsu" \
             "nixpkgs#nix-diff"
 
       - name: Install Rust toolchain
