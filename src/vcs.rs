@@ -151,8 +151,14 @@ fn locate_repo(
         };
 
         match (has_dot_git, has_dot_jj, mode_override) {
-            (true, true, Some(VcsMode::Jujutsu) | None) => return Ok((path, VcsMode::Jujutsu)),
-            (true, false, Some(VcsMode::Git) | None) => return Ok((path, VcsMode::Git)),
+            (true, true, Some(VcsMode::Jujutsu) | None) => {
+                tracing::debug!(?path, "found a Jujutsu workspace");
+                return Ok((path, VcsMode::Jujutsu));
+            }
+            (true, false, Some(VcsMode::Git) | None) => {
+                tracing::debug!(?path, "found a Git workspace");
+                return Ok((path, VcsMode::Git));
+            }
 
             (true, false, Some(VcsMode::Jujutsu)) => {
                 return Err(eyre!(

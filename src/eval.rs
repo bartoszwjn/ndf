@@ -37,6 +37,7 @@ impl<'spec> EvalSpec<'spec> {
     pub(crate) fn run(&self, spec: &DiffSpec) -> EvalResult {
         let attr_path = self.attr_path;
         let commit_id = self.commit_id;
+        tracing::debug!(attr_path = %attr_path.display(), commit_id, "evaluating derivation path");
         tracing::error_span!("eval_drv_path", attr_path = %attr_path.display(), commit_id).in_scope(
             || match nix::get_drv_path(
                 spec.repo.root(),
