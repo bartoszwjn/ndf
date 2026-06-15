@@ -3,7 +3,7 @@ members = ["crates/*"]
 
 [package]
 name = "ndf"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "Tool for comparing multiple Nix derivations between commits"
 readme = "README.md"
