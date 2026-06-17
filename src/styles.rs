@@ -11,6 +11,14 @@ pub(crate) const ATTR_PATH_QUOTED: Style = AnsiColor::Green.on_default();
 pub(crate) const ATTR_PATH_NIXOS: Style = AnsiColor::Magenta.on_default();
 pub(crate) const WORKING_TREE: Style = AnsiColor::Magenta.on_default();
 
+pub(crate) const PATTERN: Style = AnsiColor::Cyan.on_default();
+pub(crate) const PATTERN_EMPTY: Style = AnsiColor::Green.on_default();
+pub(crate) const PATTERN_QUOTED: Style = AnsiColor::Green.on_default();
+pub(crate) const PATTERN_STAR: Style = AnsiColor::Yellow.on_default();
+pub(crate) const PATTERN_QUESTION_MARK: Style = AnsiColor::Yellow.on_default();
+pub(crate) const PATTERN_BRACKET_EXPR: Style = AnsiColor::Yellow.on_default();
+pub(crate) const PATTERN_BRACKET_EXPR_NEGATED: Style = AnsiColor::Red.on_default();
+
 pub(crate) const EQUAL: Style = AnsiColor::Green.on_default();
 pub(crate) const NOT_EQUAL: Style = AnsiColor::Red.on_default();
 pub(crate) const UNKNOWN: Style = AnsiColor::BrightBlack.on_default();

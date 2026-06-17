@@ -3,6 +3,7 @@ use std::{fmt, path::Path, sync::Mutex};
 use crate::{
     attr_path::AttrPath,
     command::Cmd,
+    glob::Pattern,
     source::{FlakePath, Source},
 };
 
@@ -80,6 +81,25 @@ pub(crate) fn get_file_output_attributes(
             ["--arg", "rev", "null"]
         })
         .output_json()
+}
+
+pub(crate) fn get_matching_flake_outputs(
+    _flake_path: &FlakePath,
+    _commit_id: Option<&str>,
+    _nixos: bool,
+    _impure: bool,
+    _patterns: &[Pattern],
+) -> eyre::Result<Vec<Vec<AttrPath>>> {
+    todo!()
+}
+
+pub(crate) fn get_matching_file_outputs(
+    _repo_root: &Path,
+    _file_path: &Path,
+    _commit_id: Option<&str>,
+    _patterns: &[Pattern],
+) -> eyre::Result<Vec<Vec<AttrPath>>> {
+    todo!()
 }
 
 pub(crate) fn prefetch_flake(flake_path: &FlakePath, commit_id: Option<&str>) -> eyre::Result<()> {

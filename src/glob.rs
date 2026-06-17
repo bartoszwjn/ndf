@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::source::Source;
 
+mod display;
 #[cfg(test)]
 mod tests;
 

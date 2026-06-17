@@ -339,14 +339,14 @@ fn get_attr_paths(
             .collect();
         Ok(paths)
     } else if glob {
-        let _patterns = attr_paths
+        let patterns = attr_paths
             .iter()
             .map(|path| {
                 Pattern::from_cli_arg(path, spec.source)
                     .wrap_err_with(|| format!("invalid value for positional argument: {path:?}"))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        todo!()
+        get_matching_output_attrs(spec, &patterns)
     } else {
         // In the other branches Nix fetches the sources when computing attr names.
         prefetch_sources(spec)?;
@@ -374,15 +374,61 @@ fn get_default_attr_names(spec: PartialSpec) -> eyre::Result<Vec<String>> {
         }
     };
 
-    if from_commit == to_commit {
-        get_for_commit(from_commit)
-    } else {
-        let mut names = get_for_commit(from_commit)?;
+    let mut names = get_for_commit(from_commit)?;
+    if from_commit != to_commit {
         names.extend(get_for_commit(to_commit)?);
         names.sort();
         names.dedup();
-        Ok(names)
     }
+    Ok(names)
+}
+
+fn get_matching_output_attrs(
+    spec: PartialSpec,
+    patterns: &[Pattern],
+) -> eyre::Result<Vec<AttrPath>> {
+    let from_commit = spec.from.commit_id();
+    let to_commit = spec.to.commit_id();
+
+    let get_for_commit = |commit_id| match spec.source {
+        Source::Flake(flake_path) => nix::get_matching_flake_outputs(
+            flake_path,
+            commit_id,
+            spec.nixos,
+            spec.impure,
+            patterns,
+        ),
+        Source::File(file_path) => {
+            nix::get_matching_file_outputs(spec.repo.root(), file_path, commit_id, patterns)
+        }
+    };
+
+    let mut attr_paths_by_pattern = get_for_commit(from_commit)?;
+    if from_commit != to_commit {
+        let attr_paths_by_pattern_2 = get_for_commit(to_commit)?;
+        assert_eq!(attr_paths_by_pattern.len(), attr_paths_by_pattern_2.len());
+        for (l, r) in attr_paths_by_pattern
+            .iter_mut()
+            .zip(attr_paths_by_pattern_2)
+        {
+            l.extend(r);
+        }
+    }
+
+    assert_eq!(patterns.len(), attr_paths_by_pattern.len());
+    for (pattern, attr_paths) in patterns.iter().zip(&attr_paths_by_pattern) {
+        if attr_paths.is_empty() {
+            tracing::warn!(%pattern, "pattern did not match any attribute paths");
+        }
+    }
+
+    let mut attr_paths = attr_paths_by_pattern
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    attr_paths.sort();
+    attr_paths.dedup();
+    Ok(attr_paths)
 }
 
 /// Try to force Nix to fetch the Git revisions that will be used for evaluation.
@@ -402,14 +448,11 @@ fn prefetch_sources(spec: PartialSpec) -> eyre::Result<()> {
         Source::File(_) => Ok(()),
     };
 
-    if from_commit == to_commit {
-        prefetch_commit(from_commit)
-    } else {
-        for commit in [from_commit, to_commit] {
-            prefetch_commit(commit)?;
-        }
-        Ok(())
+    prefetch_commit(from_commit)?;
+    if from_commit != to_commit {
+        prefetch_commit(to_commit)?
     }
+    Ok(())
 }
 
 fn build_thread_pool(eval_jobs: isize) -> eyre::Result<Option<ThreadPool>> {

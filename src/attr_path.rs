@@ -5,18 +5,18 @@ use crate::source::Source;
 #[cfg(test)]
 mod tests;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct AttrPath {
-    parts: Vec<String>,
     leading_dot: bool,
+    parts: Vec<String>,
     nixos: bool,
 }
 
 impl AttrPath {
     pub(crate) fn new(leading_dot: bool, parts: Vec<String>, nixos: bool) -> Self {
         Self {
-            parts,
             leading_dot,
+            parts,
             nixos,
         }
     }
