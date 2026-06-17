@@ -19,7 +19,7 @@ const AFTER_HELP: &str = "\
 
 /// Compare Nix derivations between two revisions.
 #[derive(clap::Parser, Debug)]
-#[command(version, after_help(AFTER_HELP))]
+#[command(version, after_help(AFTER_HELP), max_term_width(100))]
 pub struct NdfApp {
     /// Attribute paths to compare.
     ///
