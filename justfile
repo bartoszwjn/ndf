@@ -7,6 +7,10 @@ check:
     nix flake check --keep-going
     cargo test --test integration
 
+# Run `cargo clippy`
+clippy:
+    cargo clippy --workspace --all-targets
+
 # Update the expected outputs of integration tests based on actual outputs.
 update-integration-tests *test_names:
     NDF_TESTS_UPDATE=1 cargo test --test integration -- --exact {{ test_names }}
