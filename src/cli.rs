@@ -95,6 +95,10 @@ pub struct NdfApp {
     #[arg(long, verbatim_doc_comment)]
     nixos: bool,
 
+    /// Interpret each `<ATTR_PATH>` as a glob pattern (not implemented yet).
+    #[arg(long, short = 'g', hide(true))]
+    glob: bool,
+
     /// Evaluate flake outputs without pure evaluation mode.
     ///
     /// Has no effect when used with `--file`.
@@ -234,10 +238,6 @@ impl NdfApp {
         let repo = Repository::for_source(&source, vcs_mode_override)?;
         let (from, to) = self.make_from_and_to(&repo)?;
 
-        let tool_extra_args = self
-            .tool_extra_args
-            .unwrap_or_else(|| default_tool_args(self.tool));
-
         let base = self
             .base
             .as_deref()
@@ -245,24 +245,11 @@ impl NdfApp {
             .transpose()
             .wrap_err_with(|| format!("invalid value for option '--base': {:?}", self.base))?;
 
-        let attr_paths = if self.attr_paths.is_empty() {
-            get_default_attr_names(&repo, &source, &from, &to, self.nixos, self.impure)
-                .wrap_err("failed to determine default attribute paths")?
-                .into_iter()
-                .map(|name| AttrPath::new(false, vec![name], self.nixos))
-                .collect()
-        } else {
-            // In the other branch Nix fetches the sources when computing default attr names.
-            prefetch_sources(&repo, &source, &from, &to)?;
-            self.attr_paths
-                .iter()
-                .map(|path| {
-                    AttrPath::from_cli_arg(path, &source, self.nixos).wrap_err_with(|| {
-                        format!("invalid value for positional argument: {path:?}")
-                    })
-                })
-                .collect::<Result<_, _>>()?
-        };
+        let attr_paths = self.get_attr_paths(&repo, &source, &from, &to)?;
+
+        let tool_extra_args = self
+            .tool_extra_args
+            .unwrap_or_else(|| default_tool_args(self.tool));
 
         Ok(DiffSpec {
             source,
@@ -302,6 +289,37 @@ impl NdfApp {
             (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
                 unreachable!("--revision is mutually exclusive with --from and --to")
             }
+        }
+    }
+
+    fn get_attr_paths(
+        &self,
+        repo: &Repository,
+        source: &Source,
+        from: &Revision,
+        to: &Revision,
+    ) -> eyre::Result<Vec<AttrPath>> {
+        if self.attr_paths.is_empty() {
+            let names = get_default_attr_names(repo, source, from, to, self.nixos, self.impure)
+                .wrap_err("failed to determine default attribute paths")?;
+            let paths = names
+                .into_iter()
+                .map(|name| AttrPath::new(false, vec![name], self.nixos))
+                .collect();
+            Ok(paths)
+        } else if self.glob {
+            todo!()
+        } else {
+            // In the other branches Nix fetches the sources when computing attr names.
+            prefetch_sources(repo, source, from, to)?;
+            self.attr_paths
+                .iter()
+                .map(|path| {
+                    AttrPath::from_cli_arg(path, source, self.nixos).wrap_err_with(|| {
+                        format!("invalid value for positional argument: {path:?}")
+                    })
+                })
+                .collect()
         }
     }
 }
