@@ -26,7 +26,7 @@ impl AttrPath {
         this.nixos = nixos;
 
         if this.leading_dot && matches!(source, Source::File(_)) {
-            eyre::bail!("attribute paths with leading dots cannot be used together with '--file'")
+            eyre::bail!("attribute paths with leading dots cannot be used together with '--file'");
         }
 
         Ok(this)
@@ -123,8 +123,7 @@ impl AttrPath {
         };
 
         if s.is_empty() {
-            let parts = Vec::new();
-            return Ok(Self::new(leading_dot, parts, false));
+            return Ok(Self::new(leading_dot, Vec::new(), false));
         }
 
         let mut parts = Vec::new();
@@ -168,7 +167,7 @@ impl AttrPath {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum ParseError {
+enum ParseError {
     ConsecutiveDots,
     TrailingDot,
     NoClosingQuote,
@@ -178,22 +177,22 @@ impl std::error::Error for ParseError {}
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+impl ParseError {
+    fn message(&self) -> &'static str {
         match self {
             ParseError::ConsecutiveDots => {
-                write!(
-                    f,
-                    "consecutive dots are not allowed in attribute paths \
-                    (empty attribute names must be quoted)"
-                )
+                "consecutive dots are not allowed in attribute paths \
+                (empty attribute names must be quoted)"
             }
             ParseError::TrailingDot => {
-                write!(
-                    f,
-                    "trailing dots are not allowed in attribute paths \
-                    (empty attribute names must be quoted)"
-                )
+                "trailing dots are not allowed in attribute paths \
+                (empty attribute names must be quoted)"
             }
-            ParseError::NoClosingQuote => write!(f, "missing closing quote in attribute path"),
+            ParseError::NoClosingQuote => "missing closing quote in attribute path",
         }
     }
 }

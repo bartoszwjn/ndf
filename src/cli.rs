@@ -6,7 +6,9 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use crate::{
     attr_path::AttrPath,
     diff_spec::DiffSpec,
-    eval, nix,
+    eval,
+    glob::Pattern,
+    nix,
     source::Source,
     summary::EvalResultCmp,
     vcs::{Repository, Revision, VcsMode},
@@ -308,6 +310,15 @@ impl NdfApp {
                 .collect();
             Ok(paths)
         } else if self.glob {
+            let _patterns = self
+                .attr_paths
+                .iter()
+                .map(|path| {
+                    Pattern::from_cli_arg(path, source).wrap_err_with(|| {
+                        format!("invalid value for positional argument: {path:?}")
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             todo!()
         } else {
             // In the other branches Nix fetches the sources when computing attr names.

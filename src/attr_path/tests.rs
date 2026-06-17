@@ -64,13 +64,12 @@ fn parse_cli_arg_errors() {
         ("\"foo.bar\".baz.quux\"", ParseError::NoClosingQuote),
     ];
 
-    for case in cases {
-        let result = AttrPath::parse_cli_arg(case.0);
+    for (input, expected) in cases {
+        let result = AttrPath::parse_cli_arg(input);
         assert_eq!(
+            Err(expected),
             result,
-            Err(case.1),
-            "{:?}: unexpected result of AttrPath::parse_cli_arg",
-            case.0,
+            "{input:?}: unexpected result of AttrPath::parse_cli_arg",
         );
     }
 }
