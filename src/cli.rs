@@ -247,7 +247,18 @@ impl NdfApp {
             .transpose()
             .wrap_err_with(|| format!("invalid value for option '--base': {:?}", self.base))?;
 
-        let attr_paths = self.get_attr_paths(&repo, &source, &from, &to)?;
+        let attr_paths = get_attr_paths(
+            PartialSpec {
+                repo: &repo,
+                source: &source,
+                from: &from,
+                to: &to,
+                nixos: self.nixos,
+                impure: self.impure,
+            },
+            &self.attr_paths,
+            self.glob,
+        )?;
 
         let tool_extra_args = self
             .tool_extra_args
@@ -293,46 +304,6 @@ impl NdfApp {
             }
         }
     }
-
-    fn get_attr_paths(
-        &self,
-        repo: &Repository,
-        source: &Source,
-        from: &Revision,
-        to: &Revision,
-    ) -> eyre::Result<Vec<AttrPath>> {
-        if self.attr_paths.is_empty() {
-            let names = get_default_attr_names(repo, source, from, to, self.nixos, self.impure)
-                .wrap_err("failed to determine default attribute paths")?;
-            let paths = names
-                .into_iter()
-                .map(|name| AttrPath::new(false, vec![name], self.nixos))
-                .collect();
-            Ok(paths)
-        } else if self.glob {
-            let _patterns = self
-                .attr_paths
-                .iter()
-                .map(|path| {
-                    Pattern::from_cli_arg(path, source).wrap_err_with(|| {
-                        format!("invalid value for positional argument: {path:?}")
-                    })
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            todo!()
-        } else {
-            // In the other branches Nix fetches the sources when computing attr names.
-            prefetch_sources(repo, source, from, to)?;
-            self.attr_paths
-                .iter()
-                .map(|path| {
-                    AttrPath::from_cli_arg(path, source, self.nixos).wrap_err_with(|| {
-                        format!("invalid value for positional argument: {path:?}")
-                    })
-                })
-                .collect()
-        }
-    }
 }
 
 fn default_tool_args(tool: DiffTool) -> Vec<String> {
@@ -344,24 +315,62 @@ fn default_tool_args(tool: DiffTool) -> Vec<String> {
     }
 }
 
-fn get_default_attr_names(
-    repo: &Repository,
-    source: &Source,
-    from: &Revision,
-    to: &Revision,
+#[derive(Clone, Copy, Debug)]
+struct PartialSpec<'a> {
+    repo: &'a Repository,
+    source: &'a Source,
+    from: &'a Revision,
+    to: &'a Revision,
     nixos: bool,
     impure: bool,
-) -> eyre::Result<Vec<String>> {
-    let from_commit = from.commit_id();
-    let to_commit = to.commit_id();
+}
 
-    let get_for_commit = |commit_id| match source {
-        Source::Flake(flake_path) if nixos => {
-            nix::get_flake_nixos_configurations(flake_path, commit_id, impure)
+fn get_attr_paths(
+    spec: PartialSpec,
+    attr_paths: &[String],
+    glob: bool,
+) -> eyre::Result<Vec<AttrPath>> {
+    if attr_paths.is_empty() {
+        let names =
+            get_default_attr_names(spec).wrap_err("failed to determine default attribute paths")?;
+        let paths = names
+            .into_iter()
+            .map(|name| AttrPath::new(false, vec![name], spec.nixos))
+            .collect();
+        Ok(paths)
+    } else if glob {
+        let _patterns = attr_paths
+            .iter()
+            .map(|path| {
+                Pattern::from_cli_arg(path, spec.source)
+                    .wrap_err_with(|| format!("invalid value for positional argument: {path:?}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        todo!()
+    } else {
+        // In the other branches Nix fetches the sources when computing attr names.
+        prefetch_sources(spec)?;
+        attr_paths
+            .iter()
+            .map(|path| {
+                AttrPath::from_cli_arg(path, spec.source, spec.nixos)
+                    .wrap_err_with(|| format!("invalid value for positional argument: {path:?}"))
+            })
+            .collect()
+    }
+}
+
+fn get_default_attr_names(spec: PartialSpec) -> eyre::Result<Vec<String>> {
+    let from_commit = spec.from.commit_id();
+    let to_commit = spec.to.commit_id();
+
+    let get_for_commit = |commit_id| match spec.source {
+        Source::Flake(flake_path) if spec.nixos => {
+            nix::get_flake_nixos_configurations(flake_path, commit_id, spec.impure)
         }
-        Source::Flake(flake_path) => nix::get_flake_packages(flake_path, commit_id, impure),
+        Source::Flake(flake_path) => nix::get_flake_packages(flake_path, commit_id, spec.impure),
         Source::File(file_path) => {
-            nix::get_file_output_attributes(repo.root(), file_path, commit_id)
+            nix::get_file_output_attributes(spec.repo.root(), file_path, commit_id)
         }
     };
 
@@ -383,18 +392,13 @@ fn get_default_attr_names(
 ///
 /// This is only a best-effort attempt, since we won't know all the sources Nix will have to fetch
 /// without actually performing the evaluation.
-fn prefetch_sources(
-    repo: &Repository,
-    source: &Source,
-    from: &Revision,
-    to: &Revision,
-) -> eyre::Result<()> {
-    let from_commit = from.commit_id();
-    let to_commit = to.commit_id();
+fn prefetch_sources(spec: PartialSpec) -> eyre::Result<()> {
+    let from_commit = spec.from.commit_id();
+    let to_commit = spec.to.commit_id();
 
-    let prefetch_commit = |commit| match source {
+    let prefetch_commit = |commit| match spec.source {
         Source::Flake(flake_path) => nix::prefetch_flake(flake_path, commit),
-        Source::File(_) if let Some(rev) = commit => nix::prefetch_repo(repo.root(), rev),
+        Source::File(_) if let Some(rev) = commit => nix::prefetch_repo(spec.repo.root(), rev),
         Source::File(_) => Ok(()),
     };
 
