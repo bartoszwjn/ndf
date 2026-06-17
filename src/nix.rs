@@ -3,7 +3,7 @@ use std::{fmt, path::Path, sync::Mutex};
 use crate::{
     attr_path::AttrPath,
     command::Cmd,
-    glob::Pattern,
+    glob::{AttrQuery, FlakeAttrPathQuery, Pattern},
     source::{FlakePath, Source},
 };
 
@@ -78,8 +78,12 @@ pub(crate) fn get_matching_flake_outputs(
     _commit_id: Option<&str>,
     _nixos: bool,
     _impure: bool,
-    _patterns: &[Pattern],
+    patterns: &[Pattern],
 ) -> eyre::Result<Vec<Vec<AttrPath>>> {
+    let queries = patterns.iter().map(|pat| pat.flake_query()).collect();
+    let _queries_json = serde_json::to_string::<Vec<FlakeAttrPathQuery>>(&queries)
+        .expect("serializing FlakeAttrPathQuery should never fail");
+
     todo!()
 }
 
@@ -87,8 +91,12 @@ pub(crate) fn get_matching_file_outputs(
     _repo_root: &Path,
     _file_path: &Path,
     _commit_id: Option<&str>,
-    _patterns: &[Pattern],
+    patterns: &[Pattern],
 ) -> eyre::Result<Vec<Vec<AttrPath>>> {
+    let queries = patterns.iter().map(|pat| pat.file_query()).collect();
+    let _queries_json = serde_json::to_string::<Vec<Vec<AttrQuery>>>(&queries)
+        .expect("serializing AttrQuery should never fail");
+
     todo!()
 }
 

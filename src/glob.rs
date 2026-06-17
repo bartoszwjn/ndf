@@ -49,6 +49,34 @@ struct BracketExpr {
     content: String,
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FlakeAttrPathQuery {
+    pub(crate) leading_dot: bool,
+    pub(crate) path: Vec<AttrQuery>,
+}
+
+/// Serialization of a [`Part`] that can be used to match zero or more attribute names.
+///
+/// These values are passed to Nix code, which does the actual matching.
+///
+/// Normally it would be more idiomatic to make this an `enum`,
+/// but this form is more convenient to work with in Nix.
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct AttrQuery {
+    pub(crate) value: String,
+    /// Whether `value` is a regular expression.
+    ///
+    /// When `true`, `value` is an [extended POSIX regular expression][posix-re].
+    /// It's meant to be used as the first argument to Nix's `builtins.match` function,
+    /// to match against the attribute name.
+    ///
+    /// When `false`, `value` is a literal string that has to match the attribute name exactly.
+    ///
+    /// [posix-re]: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04
+    pub(crate) regex: bool,
+}
+
 impl Pattern {
     pub(crate) fn from_cli_arg(arg: &str, source: &Source) -> eyre::Result<Self> {
         let this = parse_pattern(arg)?;
@@ -58,6 +86,67 @@ impl Pattern {
         }
 
         Ok(this)
+    }
+
+    pub(crate) fn file_query(&self) -> Vec<AttrQuery> {
+        self.parts.iter().map(|part| part.to_query()).collect()
+    }
+
+    pub(crate) fn flake_query(&self) -> FlakeAttrPathQuery {
+        FlakeAttrPathQuery {
+            leading_dot: self.leading_dot,
+            path: self.file_query(),
+        }
+    }
+}
+
+impl Part {
+    fn to_query(&self) -> AttrQuery {
+        let mut value = String::new();
+        let mut regex = false;
+
+        let mut segments = self.segments.iter().peekable();
+
+        while let Some(Segment::Literal(literal)) = segments.peek() {
+            value.push_str(literal);
+            segments.next();
+        }
+
+        if segments.peek().is_some() {
+            regex = true;
+            let literal = std::mem::take(&mut value);
+            Self::escape_literal(&literal, &mut value);
+            for segment in segments {
+                match segment {
+                    Segment::Literal(literal) => Self::escape_literal(literal, &mut value),
+                    Segment::QuestionMark => value.push('.'),
+                    Segment::Star => value.push_str(".*"),
+                    Segment::BracketExpr(bracket_expr) => {
+                        value.push('[');
+                        if bracket_expr.negated {
+                            value.push('^');
+                        }
+                        value.push_str(&bracket_expr.content);
+                        value.push(']');
+                    }
+                }
+            }
+        }
+
+        AttrQuery { value, regex }
+    }
+
+    fn escape_literal(literal: &str, out: &mut String) {
+        // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04_03
+        const ERE_SPECIAL_CHARS: &[char] =
+            &['.', '[', '\\', '(', '*', '+', '?', '{', '|', '^', '$'];
+
+        for c in literal.chars() {
+            if ERE_SPECIAL_CHARS.contains(&c) {
+                out.push('\\');
+            }
+            out.push(c);
+        }
     }
 }
 
