@@ -397,9 +397,13 @@ fn get_matching_output_attrs(
             spec.impure,
             patterns,
         ),
-        Source::File(file_path) => {
-            nix::get_matching_file_outputs(spec.repo.root(), file_path, commit_id, patterns)
-        }
+        Source::File(file_path) => nix::get_matching_file_outputs(
+            spec.repo.root(),
+            file_path,
+            commit_id,
+            spec.nixos,
+            patterns,
+        ),
     };
 
     let mut attr_paths_by_pattern = get_for_commit(from_commit)?;

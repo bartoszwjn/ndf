@@ -97,30 +97,85 @@ pub(crate) fn get_file_output_names(
 }
 
 pub(crate) fn get_matching_flake_outputs(
-    _flake_path: &FlakePath,
-    _commit_id: Option<&str>,
-    _nixos: bool,
-    _impure: bool,
+    flake_path: &FlakePath,
+    commit_id: Option<&str>,
+    nixos: bool,
+    impure: bool,
     patterns: &[Pattern],
 ) -> eyre::Result<Vec<Vec<AttrPath>>> {
     let queries = patterns.iter().map(|pat| pat.flake_query()).collect();
-    let _queries_json = serde_json::to_string::<Vec<FlakeAttrPathQuery>>(&queries)
+    let queries_json = serde_json::to_string::<Vec<FlakeAttrPathQuery>>(&queries)
         .expect("serializing FlakeAttrPathQuery should never fail");
+    let queries_json_expr = to_string_literal(&queries_json);
 
-    todo!()
+    let current_system = get_current_system()?;
+    let system_expr = to_string_literal(&current_system);
+
+    let apply_base_expr = include_str!("nix/get-matching-flake-outputs.nix");
+    let apply_expr = format!(
+        "({apply_base_expr}) {{ \
+            queriesJson = {queries_json_expr}; \
+            nixos = {nixos}; \
+            system = {system_expr}; \
+        }}"
+    );
+
+    let output = nix_eval_json(impure)
+        .args(["--apply", &apply_expr])
+        .args(["--", &make_flake_root_output(flake_path, commit_id)])
+        .output_json::<Vec<Vec<Vec<String>>>>()?;
+
+    if queries.len() != output.len() {
+        eyre::bail!(
+            "nix eval result contains an unexpected number of elements \
+            (expected {}, got {})",
+            queries.len(),
+            output.len(),
+        );
+    }
+
+    Ok(output
+        .into_iter()
+        .zip(&queries)
+        .map(|(query_results, query)| {
+            map_vec(query_results, |result| {
+                AttrPath::new(query.leading_dot, result, nixos)
+            })
+        })
+        .collect())
 }
 
 pub(crate) fn get_matching_file_outputs(
-    _repo_root: &Path,
-    _file_path: &Path,
-    _commit_id: Option<&str>,
+    repo_root: &Path,
+    file_path: &Path,
+    commit_id: Option<&str>,
+    nixos: bool,
     patterns: &[Pattern],
 ) -> eyre::Result<Vec<Vec<AttrPath>>> {
     let queries = patterns.iter().map(|pat| pat.file_query()).collect();
-    let _queries_json = serde_json::to_string::<Vec<Vec<AttrQuery>>>(&queries)
+    let queries_json = serde_json::to_string::<Vec<Vec<AttrQuery>>>(&queries)
         .expect("serializing AttrQuery should never fail");
 
-    todo!()
+    let output = nix_instantiate_eval_json()
+        .args(["--expr", include_str!("nix/get-matching-file-outputs.nix")])
+        .nix_argstr("repoRoot", repo_root)
+        .nix_argstr("pathInRepo", make_path_in_repo(repo_root, file_path))
+        .nix_argstr_nullable("rev", commit_id)
+        .nix_argstr("queriesJson", &queries_json)
+        .output_json::<Vec<Vec<Vec<String>>>>()?;
+
+    if queries.len() != output.len() {
+        eyre::bail!(
+            "nix-instantiate result contains an unexpected number of elements \
+            (expected {}, got {})",
+            queries.len(),
+            output.len(),
+        );
+    }
+
+    Ok(map_vec(output, |query_results| {
+        map_vec(query_results, |result| AttrPath::new(false, result, nixos))
+    }))
 }
 
 pub(crate) fn prefetch_flake(flake_path: &FlakePath, commit_id: Option<&str>) -> eyre::Result<()> {
@@ -286,4 +341,8 @@ fn to_string_list_literal(elems: &[&str]) -> impl fmt::Display {
         write!(f, "]")?;
         Ok(())
     })
+}
+
+fn map_vec<T, U>(vec: Vec<T>, f: impl FnMut(T) -> U) -> Vec<U> {
+    vec.into_iter().map(f).collect()
 }
