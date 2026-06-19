@@ -244,20 +244,16 @@ fn to_string_literal(s: &str) -> impl fmt::Display {
 }
 
 fn to_string_list_literal(elems: &[&str]) -> impl fmt::Display {
-    use std::fmt::Write;
-
     fmt::from_fn(move |f| {
-        f.write_char('[')?;
-        let mut first = true;
-        for elem in elems {
-            if first {
-                first = false;
-            } else {
-                f.write_char(' ')?;
-            }
+        write!(f, "[")?;
+        let mut elems = elems.iter().peekable();
+        while let Some(elem) = elems.next() {
             write!(f, "{}", to_string_literal(elem))?;
+            if elems.peek().is_some() {
+                write!(f, " ")?;
+            }
         }
-        f.write_char(']')?;
+        write!(f, "]")?;
         Ok(())
     })
 }

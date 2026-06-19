@@ -8,14 +8,11 @@ where
     Iter::Item: AsRef<OsStr>,
 {
     fmt::from_fn(move |f| {
-        let mut first = true;
-        for arg in make_args() {
-            let arg = display_command_arg(arg);
-            if first {
-                first = false;
-                write!(f, "{arg}")?;
-            } else {
-                write!(f, " {arg}")?;
+        let mut args = make_args().peekable();
+        while let Some(arg) = args.next() {
+            write!(f, "{}", display_command_arg(arg))?;
+            if args.peek().is_some() {
+                write!(f, " ")?;
             }
         }
         Ok(())

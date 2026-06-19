@@ -60,14 +60,12 @@ impl fmt::Display for Summary {
         use crate::styles::HEADER;
 
         writeln!(f, "{HEADER}Summary:{HEADER:#}")?;
-        let mut first = true;
-        for item in &self.items {
-            if first {
-                first = false;
-            } else {
+        let mut items = self.items.iter().peekable();
+        while let Some(item) = items.next() {
+            write!(f, "{item}")?;
+            if items.peek().is_some() {
                 writeln!(f)?;
             }
-            write!(f, "{item}")?;
         }
         Ok(())
     }

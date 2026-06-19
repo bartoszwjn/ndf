@@ -87,18 +87,16 @@ impl AttrPath {
                 write!(f, "{ATTR_PATH_QUOTED}(empty){ATTR_PATH_QUOTED:#}")?;
             }
 
-            let mut first = true;
-            for part in &self.parts {
-                if first {
-                    first = false;
-                } else {
-                    write!(f, "{ATTR_PATH}.{ATTR_PATH:#}")?;
-                }
-
+            let mut parts = self.parts.iter().peekable();
+            while let Some(part) = parts.next() {
                 if Self::part_needs_quotes(part) {
                     write!(f, "{ATTR_PATH_QUOTED}\"{part}\"{ATTR_PATH_QUOTED:#}")?;
                 } else {
                     write!(f, "{ATTR_PATH}{part}{ATTR_PATH:#}")?;
+                }
+
+                if parts.peek().is_some() {
+                    write!(f, "{ATTR_PATH}.{ATTR_PATH:#}")?;
                 }
             }
 
