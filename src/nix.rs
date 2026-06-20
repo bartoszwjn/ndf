@@ -1,4 +1,4 @@
-use std::{fmt, path::Path, sync::Mutex};
+use std::{ffi::OsStr, fmt, path::Path, sync::Mutex};
 
 use crate::{
     attr_path::AttrPath,
@@ -10,6 +10,43 @@ use crate::{
 #[cfg(test)]
 mod tests;
 
+fn nix_instantiate_eval_json() -> Cmd {
+    let mut cmd = Cmd::nix_instantiate();
+    cmd.args(["--eval", "--strict", "--json"]);
+    cmd
+}
+
+fn nix_eval_json(impure: bool) -> Cmd {
+    let mut cmd = Cmd::nix();
+    cmd.args(["--extra-experimental-features", "nix-command flakes"]);
+    cmd.args(["eval", "--json"]);
+    if impure {
+        cmd.arg("--impure");
+    }
+    cmd
+}
+
+impl Cmd {
+    fn nix_argstr(&mut self, name: &str, value: impl AsRef<OsStr>) -> &mut Cmd {
+        self.args(["--argstr", name]);
+        self.arg(value);
+        self
+    }
+
+    fn nix_argstr_nullable(&mut self, name: &str, value: Option<impl AsRef<OsStr>>) -> &mut Cmd {
+        match value {
+            Some(value) => {
+                self.args(["--argstr", name]);
+                self.arg(value);
+            }
+            None => {
+                self.args(["--arg", name, "null"]);
+            }
+        }
+        self
+    }
+}
+
 fn get_current_system() -> eyre::Result<String> {
     static CURRENT_SYSTEM: Mutex<Option<String>> = Mutex::new(None);
 
@@ -17,8 +54,7 @@ fn get_current_system() -> eyre::Result<String> {
     match &*lock {
         Some(system) => Ok(system.clone()),
         None => {
-            let system: String = Cmd::nix_instantiate()
-                .args(["--eval", "--strict", "--json"])
+            let system: String = nix_instantiate_eval_json()
                 .args(["--expr", "builtins.currentSystem"])
                 .output_json()?;
             *lock = Some(system.clone());
@@ -33,22 +69,16 @@ pub(crate) fn get_flake_output_names(
     nixos: bool,
     impure: bool,
 ) -> eyre::Result<Vec<String>> {
-    let root_attr = if nixos {
-        "nixosConfigurations"
+    let apply_expr = if nixos {
+        "flake: builtins.attrNames (flake.nixosConfigurations or { })"
     } else {
         let current_system = get_current_system()?;
         let system = to_string_literal(&current_system);
-        &format!("packages.{system}")
+        &format!("flake: builtins.attrNames (flake.packages.{system} or {{ }})")
     };
 
-    Cmd::nix()
-        .args(["--extra-experimental-features", "nix-command flakes"])
-        .args(["eval", "--json"])
-        .args(if impure { ["--impure"].as_slice() } else { &[] })
-        .args([
-            "--apply",
-            &format!("flake: builtins.attrNames (flake.{root_attr} or {{ }})"),
-        ])
+    nix_eval_json(impure)
+        .args(["--apply", apply_expr])
         .args(["--", &make_flake_root_output(flake_path, commit_id)])
         .output_json()
 }
@@ -58,18 +88,11 @@ pub(crate) fn get_file_output_names(
     file_path: &Path,
     commit_id: Option<&str>,
 ) -> eyre::Result<Vec<String>> {
-    Cmd::nix_instantiate()
-        .args(["--eval", "--strict", "--json"])
+    nix_instantiate_eval_json()
         .args(["--expr", include_str!("nix/get-file-output-attributes.nix")])
-        .args(["--argstr", "repoRoot"])
-        .arg(repo_root)
-        .args(["--argstr", "pathInRepo"])
-        .arg(make_path_in_repo(repo_root, file_path))
-        .args(if let Some(rev) = commit_id {
-            ["--argstr", "rev", rev]
-        } else {
-            ["--arg", "rev", "null"]
-        })
+        .nix_argstr("repoRoot", repo_root)
+        .nix_argstr("pathInRepo", make_path_in_repo(repo_root, file_path))
+        .nix_argstr_nullable("rev", commit_id)
         .output_json()
 }
 
@@ -109,12 +132,10 @@ pub(crate) fn prefetch_flake(flake_path: &FlakePath, commit_id: Option<&str>) ->
 }
 
 pub(crate) fn prefetch_repo(repo_root: &Path, commit_id: &str) -> eyre::Result<()> {
-    Cmd::nix_instantiate()
-        .args(["--eval", "--strict", "--json"])
+    nix_instantiate_eval_json()
         .args(["--expr", include_str!("nix/fetch-repo.nix")])
-        .args(["--argstr", "repoRoot"])
-        .arg(repo_root)
-        .args(["--argstr", "rev", commit_id])
+        .nix_argstr("repoRoot", repo_root)
+        .nix_argstr("rev", commit_id)
         .run_capture_stdio()
 }
 
@@ -163,10 +184,7 @@ fn get_drv_path_flake(
         format!("({apply_expr_base}) {{ attrPath = {attr_path_expr}; system = {system_expr}; }}")
     };
 
-    Cmd::nix()
-        .args(["--extra-experimental-features", "nix-command flakes"])
-        .args(["eval", "--json"])
-        .args(if impure { ["--impure"].as_slice() } else { &[] })
+    nix_eval_json(impure)
         // Eval cache hardly works, sometimes it even seems to make things slower.
         // It also causes Nix to report "SQLite database is busy" errors
         // when running multiple evaluations in parallel.
@@ -185,19 +203,13 @@ fn get_drv_path_file(
     let attr_path_json = serde_json::to_string::<Vec<&str>>(&attr_path.file_query())
         .expect("serializing a list of strings into a String cannot fail");
 
-    Cmd::nix_instantiate()
-        .args(["--eval", "--strict", "--json", "--read-write-mode"])
+    nix_instantiate_eval_json()
+        .arg("--read-write-mode")
         .args(["--expr", include_str!("nix/get-drv-path-file.nix")])
-        .args(["--argstr", "repoRoot"])
-        .arg(repo_root)
-        .args(["--argstr", "pathInRepo"])
-        .arg(make_path_in_repo(repo_root, file_path))
-        .args(if let Some(rev) = commit_id {
-            ["--argstr", "rev", rev]
-        } else {
-            ["--arg", "rev", "null"]
-        })
-        .args(["--argstr", "attrPathJson", &attr_path_json])
+        .nix_argstr("repoRoot", repo_root)
+        .nix_argstr("pathInRepo", make_path_in_repo(repo_root, file_path))
+        .nix_argstr_nullable("rev", commit_id)
+        .nix_argstr("attrPathJson", &attr_path_json)
         .output_json()
 }
 
