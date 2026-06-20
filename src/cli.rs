@@ -365,12 +365,11 @@ fn get_default_attr_names(spec: PartialSpec) -> eyre::Result<Vec<String>> {
     let to_commit = spec.to.commit_id();
 
     let get_for_commit = |commit_id| match spec.source {
-        Source::Flake(flake_path) if spec.nixos => {
-            nix::get_flake_nixos_configurations(flake_path, commit_id, spec.impure)
+        Source::Flake(flake_path) => {
+            nix::get_flake_output_names(flake_path, commit_id, spec.nixos, spec.impure)
         }
-        Source::Flake(flake_path) => nix::get_flake_packages(flake_path, commit_id, spec.impure),
         Source::File(file_path) => {
-            nix::get_file_output_attributes(spec.repo.root(), file_path, commit_id)
+            nix::get_file_output_names(spec.repo.root(), file_path, commit_id)
         }
     };
 

@@ -27,43 +27,33 @@ fn get_current_system() -> eyre::Result<String> {
     }
 }
 
-pub(crate) fn get_flake_packages(
+pub(crate) fn get_flake_output_names(
     flake_path: &FlakePath,
     commit_id: Option<&str>,
+    nixos: bool,
     impure: bool,
 ) -> eyre::Result<Vec<String>> {
-    let current_system = get_current_system()?;
-    let system = to_string_literal(&current_system);
+    let root_attr = if nixos {
+        "nixosConfigurations"
+    } else {
+        let current_system = get_current_system()?;
+        let system = to_string_literal(&current_system);
+        &format!("packages.{system}")
+    };
+
     Cmd::nix()
         .args(["--extra-experimental-features", "nix-command flakes"])
         .args(["eval", "--json"])
         .args(if impure { ["--impure"].as_slice() } else { &[] })
         .args([
             "--apply",
-            &format!("flake: builtins.attrNames (flake.packages.{system} or {{ }})"),
+            &format!("flake: builtins.attrNames (flake.{root_attr} or {{ }})"),
         ])
         .args(["--", &make_flake_root_output(flake_path, commit_id)])
         .output_json()
 }
 
-pub(crate) fn get_flake_nixos_configurations(
-    flake_path: &FlakePath,
-    commit_id: Option<&str>,
-    impure: bool,
-) -> eyre::Result<Vec<String>> {
-    Cmd::nix()
-        .args(["--extra-experimental-features", "nix-command flakes"])
-        .args(["eval", "--json"])
-        .args(if impure { ["--impure"].as_slice() } else { &[] })
-        .args([
-            "--apply",
-            "flake: builtins.attrNames (flake.nixosConfigurations or {})",
-        ])
-        .args(["--", &make_flake_root_output(flake_path, commit_id)])
-        .output_json()
-}
-
-pub(crate) fn get_file_output_attributes(
+pub(crate) fn get_file_output_names(
     repo_root: &Path,
     file_path: &Path,
     commit_id: Option<&str>,
