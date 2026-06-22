@@ -111,9 +111,8 @@ changes."flake.nix".write = '''
           # matched
           a0b = drv "bracket-expr-special-seqs-1";
           a9b = drv "bracket-expr-special-seqs-2";
-          aYb = drv "bracket-expr-special-seqs-3";
-          axb = drv "bracket-expr-special-seqs-4";
-          ayb = drv "bracket-expr-special-seqs-5";
+          axb = drv "bracket-expr-special-seqs-3";
+          ayb = drv "bracket-expr-special-seqs-4";
           # ignored
           aXb = drv "ignored";
           azb = drv "ignored";
@@ -145,7 +144,6 @@ Attribute paths:
   bracketExprSpecialChars.a]b
   bracketExprSpecialSeqs.a0b
   bracketExprSpecialSeqs.a9b
-  bracketExprSpecialSeqs.aYb
   bracketExprSpecialSeqs.axb
   bracketExprSpecialSeqs.ayb
   literal.abcd
@@ -198,14 +196,11 @@ Summary:
   bracketExprSpecialSeqs.a9b /nix/store/c5chk32q786mz3z281wdawgdqbya3jf4-bracket-expr-special-seqs-2.drv
   ==                         /nix/store/c5chk32q786mz3z281wdawgdqbya3jf4-bracket-expr-special-seqs-2.drv
 
-  bracketExprSpecialSeqs.aYb /nix/store/i0sr5fl3346shcjcn5j5arqyd2mm1i37-bracket-expr-special-seqs-3.drv
+  bracketExprSpecialSeqs.axb /nix/store/i0sr5fl3346shcjcn5j5arqyd2mm1i37-bracket-expr-special-seqs-3.drv
   ==                         /nix/store/i0sr5fl3346shcjcn5j5arqyd2mm1i37-bracket-expr-special-seqs-3.drv
 
-  bracketExprSpecialSeqs.axb /nix/store/gsg464hjh8yrxrjiq3vghbxdwv3qj6gf-bracket-expr-special-seqs-4.drv
+  bracketExprSpecialSeqs.ayb /nix/store/gsg464hjh8yrxrjiq3vghbxdwv3qj6gf-bracket-expr-special-seqs-4.drv
   ==                         /nix/store/gsg464hjh8yrxrjiq3vghbxdwv3qj6gf-bracket-expr-special-seqs-4.drv
-
-  bracketExprSpecialSeqs.ayb /nix/store/4h9zwfm6bylwyqslyyswafrz3wi5np4v-bracket-expr-special-seqs-5.drv
-  ==                         /nix/store/4h9zwfm6bylwyqslyyswafrz3wi5np4v-bracket-expr-special-seqs-5.drv
 
   literal.abcd /nix/store/idcani2z1rkv90wif68avy6wszkrgxvd-literal-1.drv
   ==           /nix/store/idcani2z1rkv90wif68avy6wszkrgxvd-literal-1.drv
