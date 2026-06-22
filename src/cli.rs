@@ -97,8 +97,8 @@ pub struct NdfApp {
     #[arg(long, verbatim_doc_comment)]
     nixos: bool,
 
-    /// Interpret each `<ATTR_PATH>` as a glob pattern (not implemented yet).
-    #[arg(long, short = 'g', hide(true))]
+    /// Interpret each `<ATTR_PATH>` as a glob pattern.
+    #[arg(long, short = 'g')]
     glob: bool,
 
     /// Evaluate flake outputs without pure evaluation mode.
