@@ -37,6 +37,9 @@ Use `--flake` to choose the flake to compare (must be a Git worktree on the loca
 `--file` to compare output attributes of a Nix expression stored in a file.
 `--revision`, `--from` and `--to` can be used to select commits that are compared to each other.
 Use positional arguments to manually specify which output attributes to compare.
+When the `--glob`/`-g` flag is used,
+positional arguments are treated as glob patterns
+and matched against the existing output attributes of the flake or file being compared.
 
 See the `--help` output for details about all command line flags and options.
 
@@ -47,12 +50,6 @@ and `jj log` is used to display them.
 The Jujutsu workspace must be a [colocated Jujutsu/Git workspace][jj-colocated-workspaces],
 since Nix does not integrate with Jujutsu directly.
 The automatic mode selection can be overridden using the `--git` and `--jj` flags.
-
-## Roadmap
-
-Planned changes:
-
-- Add `--glob` flag to allow using glob patterns in attribute paths.
 
 [Worry-free NixOS refactors]: https://www.tweag.io/blog/2022-10-11-stable-narhashes/
 [`nix-diff`]: https://github.com/Gabriella439/nix-diff/
