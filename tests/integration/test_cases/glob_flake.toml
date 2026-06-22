@@ -1,0 +1,228 @@
+[command]
+args = [
+  "--glob",
+  "literal.abcd",
+  'quoted."abc.*?[xyz]"',
+  "star.a*b*c",
+  "questionMark.a?b?c",
+  "bracketExpr.a[xyz]b[j-p]c",
+  "bracketExprNegation.a[^a-i]b[!a-i]c",
+  'bracketExprSpecialChars.a[]."*?[-]b',
+  "bracketExprSpecialSeqs.a[[:digit:][.x.][=y=]]b",
+]
+
+[repo_contents.git]
+
+[[repo_contents.git.commits]]
+message = "commit 1"
+changes."flake.nix".write = '''
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        # pattern: abcd
+        literal = {
+          # matched
+          abcd = drv "literal-1";
+          # ignored
+          abc = drv "ignored";
+          abcde = drv "ignored";
+          Abcd = drv "ignored";
+        };
+
+        # pattern: "abc.*?[xyz]"
+        quoted = {
+          # matched
+          "abc.*?[xyz]" = drv "quoted-1";
+          # ignored
+          abc.ghix = drv "ignored";
+          abc."*?[xyz]" = drv "ignored";
+          "abc.ghix" = drv "ignored";
+        };
+
+        # pattern: a*b*c
+        star = {
+          # matched
+          abc = drv "star-1";
+          axbyc = drv "star-2";
+          axbyzc = drv "star-3";
+          # ignored
+          ac = drv "ignored";
+          acb = drv "ignored";
+          aBc = drv "ignored";
+        };
+
+        # pattern: a?b?c
+        questionMark = {
+          # matched
+          axbyc = drv "question-mark-1";
+          # ignored
+          abc = drv "ignored";
+          axbc = drv "ignored";
+          axbyzc = drv "ignored";
+        };
+
+        # pattern: a[xyz]b[j-p]c
+        bracketExpr = {
+          # matched
+          axbjc = drv "bracket-expr-1";
+          aybnc = drv "bracket-expr-2";
+          azbpc = drv "bracket-expr-3";
+          # ignored
+          aabjc = drv "ignored";
+          axbac = drv "ignored";
+          abc = drv "ignored";
+          axybjc = drv "ignored";
+          axbjkc = drv "ignored";
+        };
+
+        # pattern: a[^a-i]b[!a-i]c
+        bracketExprNegation = {
+          # matched
+          ajbjc = drv "bracket-expr-negation-1";
+          axbyc = drv "bracket-expr-negation-2";
+          # ignored
+          aabac = drv "ignored";
+          adbyc = drv "ignored";
+          axbic = drv "ignored";
+        };
+
+        # pattern: a[]."*?[-]b
+        bracketExprSpecialChars = {
+          # matched
+          "a]b" = drv "bracket-expr-special-chars-7";
+          "a.b" = drv "bracket-expr-special-chars-4";
+          "a\"b" = drv "bracket-expr-special-chars-1";
+          "a*b" = drv "bracket-expr-special-chars-2";
+          "a?b" = drv "bracket-expr-special-chars-5";
+          "a[b" = drv "bracket-expr-special-chars-6";
+          "a-b" = drv "bracket-expr-special-chars-3";
+          # ignored
+          aab = drv "ignored";
+          a9b = drv "ignored";
+        };
+
+        # pattern: a[[:digit:][.x.][=y=]]b
+        bracketExprSpecialSeqs = {
+          # matched
+          a0b = drv "bracket-expr-special-seqs-1";
+          a9b = drv "bracket-expr-special-seqs-2";
+          aYb = drv "bracket-expr-special-seqs-3";
+          axb = drv "bracket-expr-special-seqs-4";
+          ayb = drv "bracket-expr-special-seqs-5";
+          # ignored
+          aXb = drv "ignored";
+          azb = drv "ignored";
+        };
+      };
+    };
+}
+'''
+
+[outputs]
+exit_code = 0
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
+Attribute paths:
+  bracketExpr.axbjc
+  bracketExpr.aybnc
+  bracketExpr.azbpc
+  bracketExprNegation.ajbjc
+  bracketExprNegation.axbyc
+  bracketExprSpecialChars."a"b"
+  bracketExprSpecialChars.a*b
+  bracketExprSpecialChars.a-b
+  bracketExprSpecialChars."a.b"
+  bracketExprSpecialChars.a?b
+  bracketExprSpecialChars.a[b
+  bracketExprSpecialChars.a]b
+  bracketExprSpecialSeqs.a0b
+  bracketExprSpecialSeqs.a9b
+  bracketExprSpecialSeqs.aYb
+  bracketExprSpecialSeqs.axb
+  bracketExprSpecialSeqs.ayb
+  literal.abcd
+  questionMark.axbyc
+  quoted."abc.*?[xyz]"
+  star.abc
+  star.axbyc
+  star.axbyzc
+
+Summary:
+  bracketExpr.axbjc /nix/store/x0ianj94f0khah84rp2qfarrfbcj6vcs-bracket-expr-1.drv
+  ==                /nix/store/x0ianj94f0khah84rp2qfarrfbcj6vcs-bracket-expr-1.drv
+
+  bracketExpr.aybnc /nix/store/kbgycfh6rhdcvibvq5a4qsmgry8ijcxz-bracket-expr-2.drv
+  ==                /nix/store/kbgycfh6rhdcvibvq5a4qsmgry8ijcxz-bracket-expr-2.drv
+
+  bracketExpr.azbpc /nix/store/lqy9rd90hcr9lvy5r8z40wpqb8gn375b-bracket-expr-3.drv
+  ==                /nix/store/lqy9rd90hcr9lvy5r8z40wpqb8gn375b-bracket-expr-3.drv
+
+  bracketExprNegation.ajbjc /nix/store/krw2fvp7zpay7pg9qkkakmjanjrkkcpb-bracket-expr-negation-1.drv
+  ==                        /nix/store/krw2fvp7zpay7pg9qkkakmjanjrkkcpb-bracket-expr-negation-1.drv
+
+  bracketExprNegation.axbyc /nix/store/dzxx24ldskybr3y19xpgf3jxybf16pjb-bracket-expr-negation-2.drv
+  ==                        /nix/store/dzxx24ldskybr3y19xpgf3jxybf16pjb-bracket-expr-negation-2.drv
+
+  bracketExprSpecialChars."a"b" /nix/store/lchr20gaaadcpjdhwcr9qijiahrw05lb-bracket-expr-special-chars-1.drv
+  ==                            /nix/store/lchr20gaaadcpjdhwcr9qijiahrw05lb-bracket-expr-special-chars-1.drv
+
+  bracketExprSpecialChars.a*b /nix/store/w7b0wv3zhqd9hcbgi5azl4ixrcqnrqv3-bracket-expr-special-chars-2.drv
+  ==                          /nix/store/w7b0wv3zhqd9hcbgi5azl4ixrcqnrqv3-bracket-expr-special-chars-2.drv
+
+  bracketExprSpecialChars.a-b /nix/store/qy2j8icqgahhm8ffjnc5dsacfhd282mc-bracket-expr-special-chars-3.drv
+  ==                          /nix/store/qy2j8icqgahhm8ffjnc5dsacfhd282mc-bracket-expr-special-chars-3.drv
+
+  bracketExprSpecialChars."a.b" /nix/store/ihk137fycsifykrcp1i8prxdf35r2ljm-bracket-expr-special-chars-4.drv
+  ==                            /nix/store/ihk137fycsifykrcp1i8prxdf35r2ljm-bracket-expr-special-chars-4.drv
+
+  bracketExprSpecialChars.a?b /nix/store/fc9k4af46p22m3hpwa42s9av7bfcrxgr-bracket-expr-special-chars-5.drv
+  ==                          /nix/store/fc9k4af46p22m3hpwa42s9av7bfcrxgr-bracket-expr-special-chars-5.drv
+
+  bracketExprSpecialChars.a[b /nix/store/pa5n85i2bawlppspi6l85iqf7pvapxiv-bracket-expr-special-chars-6.drv
+  ==                          /nix/store/pa5n85i2bawlppspi6l85iqf7pvapxiv-bracket-expr-special-chars-6.drv
+
+  bracketExprSpecialChars.a]b /nix/store/n5f0grcnh6dav56qp5la8h2rq7g8inai-bracket-expr-special-chars-7.drv
+  ==                          /nix/store/n5f0grcnh6dav56qp5la8h2rq7g8inai-bracket-expr-special-chars-7.drv
+
+  bracketExprSpecialSeqs.a0b /nix/store/lh0x3qjn21kc4m69grlfr53vf6b7pdw1-bracket-expr-special-seqs-1.drv
+  ==                         /nix/store/lh0x3qjn21kc4m69grlfr53vf6b7pdw1-bracket-expr-special-seqs-1.drv
+
+  bracketExprSpecialSeqs.a9b /nix/store/c5chk32q786mz3z281wdawgdqbya3jf4-bracket-expr-special-seqs-2.drv
+  ==                         /nix/store/c5chk32q786mz3z281wdawgdqbya3jf4-bracket-expr-special-seqs-2.drv
+
+  bracketExprSpecialSeqs.aYb /nix/store/i0sr5fl3346shcjcn5j5arqyd2mm1i37-bracket-expr-special-seqs-3.drv
+  ==                         /nix/store/i0sr5fl3346shcjcn5j5arqyd2mm1i37-bracket-expr-special-seqs-3.drv
+
+  bracketExprSpecialSeqs.axb /nix/store/gsg464hjh8yrxrjiq3vghbxdwv3qj6gf-bracket-expr-special-seqs-4.drv
+  ==                         /nix/store/gsg464hjh8yrxrjiq3vghbxdwv3qj6gf-bracket-expr-special-seqs-4.drv
+
+  bracketExprSpecialSeqs.ayb /nix/store/4h9zwfm6bylwyqslyyswafrz3wi5np4v-bracket-expr-special-seqs-5.drv
+  ==                         /nix/store/4h9zwfm6bylwyqslyyswafrz3wi5np4v-bracket-expr-special-seqs-5.drv
+
+  literal.abcd /nix/store/idcani2z1rkv90wif68avy6wszkrgxvd-literal-1.drv
+  ==           /nix/store/idcani2z1rkv90wif68avy6wszkrgxvd-literal-1.drv
+
+  questionMark.axbyc /nix/store/cd7hh1lvjx6nkff9z46jpvcwcql0rkyr-question-mark-1.drv
+  ==                 /nix/store/cd7hh1lvjx6nkff9z46jpvcwcql0rkyr-question-mark-1.drv
+
+  quoted."abc.*?[xyz]" /nix/store/ih58373qfgy6ryv9ssyvaq12m10nd9aa-quoted-1.drv
+  ==                   /nix/store/ih58373qfgy6ryv9ssyvaq12m10nd9aa-quoted-1.drv
+
+  star.abc /nix/store/w3n2zm449xpc09a0x0fc9v31bfpxssb0-star-1.drv
+  ==       /nix/store/w3n2zm449xpc09a0x0fc9v31bfpxssb0-star-1.drv
+
+  star.axbyc /nix/store/ck7g3qpbgy7fcwvpxahf3mirjpl1dc88-star-2.drv
+  ==         /nix/store/ck7g3qpbgy7fcwvpxahf3mirjpl1dc88-star-2.drv
+
+  star.axbyzc /nix/store/0br1f9xn7s1hq3lm08jpznp9p5mars2v-star-3.drv
+  ==          /nix/store/0br1f9xn7s1hq3lm08jpznp9p5mars2v-star-3.drv
+"""
+stderr = ""

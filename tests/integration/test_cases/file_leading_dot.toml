@@ -1,0 +1,19 @@
+[command]
+args = ["--file", ".", ".pkg1"]
+
+[repo_contents.git]
+
+[[repo_contents.git.commits]]
+message = "commit 1"
+changes."default.nix".write = """
+{}
+"""
+
+[outputs]
+exit_code = 2
+stdout = ""
+stderr = """
+error:
+   0: invalid value for positional argument: ".pkg1"
+   1: attribute paths with leading dots cannot be used together with '--file'
+"""

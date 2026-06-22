@@ -1,0 +1,72 @@
+[command]
+args = [
+  "--glob",
+  "--nixos",
+  "group1.nixos1",
+  "group1.nixos2",
+  "group2.nixos3",
+  "group3.nixos4",  # no leading dot -> nixosConfigurations over root
+  ".group3.nixos4", # leading dot -> root over nixosConfigurations
+  "group4.nixos5",  # no leading dot -> not searching in root at all
+  ".group1.nixos1", # leading dot -> not searching in nixosConfigurations at all
+]
+
+[repo_contents.git]
+
+[[repo_contents.git.commits]]
+message = "commit 1"
+changes."flake.nix".write = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+      nixos = name: { config.system.build.toplevel = drv name; };
+    in
+    {
+      nixosConfigurations = {
+        group1.nixos1 = nixos "nixos1";
+        group1.nixos2 = nixos "nixos2";
+        group2.nixos3 = nixos "nixos3";
+        group3.nixos4 = nixos "nixos4-cfgs";
+      };
+      group3.nixos4 = nixos "nixos4-root";
+      group4.nixos5 = nixos "nixos5";
+    };
+}
+"""
+
+[outputs]
+exit_code = 0
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
+Attribute paths:
+  group1.nixos1 (NixOS)
+  group1.nixos2 (NixOS)
+  group2.nixos3 (NixOS)
+  group3.nixos4 (NixOS)
+  .group3.nixos4 (NixOS)
+
+Summary:
+  group1.nixos1 (NixOS) /nix/store/zp9a60h66inxmz945bddp6f1v79drj5s-nixos1.drv
+  ==                    /nix/store/zp9a60h66inxmz945bddp6f1v79drj5s-nixos1.drv
+
+  group1.nixos2 (NixOS) /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
+  ==                    /nix/store/5kid5r6mn6d1pqkpxv73mjmglhk0a736-nixos2.drv
+
+  group2.nixos3 (NixOS) /nix/store/psmhx5p3azp6j0dw7ygzs2nshgwgwxs3-nixos3.drv
+  ==                    /nix/store/psmhx5p3azp6j0dw7ygzs2nshgwgwxs3-nixos3.drv
+
+  group3.nixos4 (NixOS) /nix/store/r5mhxif06kz6k96mlk965czzr6qysp33-nixos4-cfgs.drv
+  ==                    /nix/store/r5mhxif06kz6k96mlk965czzr6qysp33-nixos4-cfgs.drv
+
+  .group3.nixos4 (NixOS) /nix/store/11c4gqcgcnisgk0zky8vv3mwsmpqr5jm-nixos4-root.drv
+  ==                     /nix/store/11c4gqcgcnisgk0zky8vv3mwsmpqr5jm-nixos4-root.drv
+"""
+stderr = """
+ WARN pattern did not match any attribute paths pattern=group4.nixos5
+ WARN pattern did not match any attribute paths pattern=.group1.nixos1
+"""

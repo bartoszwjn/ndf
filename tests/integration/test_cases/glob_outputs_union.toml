@@ -1,0 +1,61 @@
+[command]
+args = ["--file", ".", "--glob", "*"]
+
+[repo_contents.git]
+
+[[repo_contents.git.commits]]
+message = "commit 1"
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1";
+  pkg3 = drv "pkg3";
+  pkg5 = drv "pkg5";
+}
+"""
+
+[repo_contents.git.index]
+changes."default.nix".write = """
+let
+  drv = import ./drv.nix;
+in
+{
+  pkg1 = drv "pkg1";
+  pkg2 = drv "pkg2";
+  pkg4 = drv "pkg4";
+}
+"""
+
+[outputs]
+exit_code = 1
+stdout = """
+File:  @REPO@/default.nix
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
+Attribute paths:
+  pkg1
+  pkg2
+  pkg3
+  pkg4
+  pkg5
+
+Summary:
+  pkg1 /nix/store/isn04dmf5r96lnv0jg1gd29cnbb5n1v6-pkg1.drv
+  ==   /nix/store/isn04dmf5r96lnv0jg1gd29cnbb5n1v6-pkg1.drv
+
+  pkg2 missing
+  !=   /nix/store/3rg5f2382wvnyh8cj299c6jr98bsj7jx-pkg2.drv
+
+  pkg3 /nix/store/dsr96x45rykd8pa5bq8wyd7n6f7gidr8-pkg3.drv
+  !=   missing
+
+  pkg4 missing
+  !=   /nix/store/2hq2m47j15yfl432zd5g267dbi6lsmns-pkg4.drv
+
+  pkg5 /nix/store/qs2vmqdrb3bammilc83v6k3x5jwm924b-pkg5.drv
+  !=   missing
+"""
+stderr = ""

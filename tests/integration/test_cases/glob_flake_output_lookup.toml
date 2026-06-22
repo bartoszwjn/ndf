@@ -1,0 +1,73 @@
+[command]
+args = [
+  "--glob",
+  "pkgs-only",
+  "legacy-only",
+  "root-only",
+  "pkgs-and-legacy",
+  "legacy-and-root",
+  ".legacy-and-root",
+]
+
+[repo_contents.git]
+
+[[repo_contents.git.commits]]
+message = "commit 1"
+changes."flake.nix".write = """
+{
+  outputs =
+    inputs:
+    let
+      drv = import ./drv.nix;
+    in
+    {
+      packages.@SYSTEM@ = {
+        pkgs-only = drv "pkgs-only";
+        pkgs-and-legacy = drv "pkgs-and-legacy-pkgs";
+      };
+      legacyPackages.@SYSTEM@ = {
+        legacy-only = drv "legacy-only";
+        pkgs-and-legacy = drv "pkgs-and-legacy-legacy";
+        legacy-and-root = drv "legacy-and-root-legacy";
+      };
+      root-only = drv "root-only";
+      legacy-and-root = drv "legacy-and-root-root";
+    };
+}
+"""
+
+[outputs]
+exit_code = 0
+stdout = """
+Flake: @REPO@
+Repo:  @REPO@
+From:  @COMMIT_1_SHORT_ID@ (HEAD -> main) commit 1
+To:    [working tree]
+Attribute paths:
+  legacy-and-root
+  legacy-only
+  pkgs-and-legacy
+  pkgs-only
+  root-only
+  .legacy-and-root
+
+Summary:
+  legacy-and-root /nix/store/z0b0rlld4jjdrdljllg1bav4lp1xl0yp-legacy-and-root-legacy.drv
+  ==              /nix/store/z0b0rlld4jjdrdljllg1bav4lp1xl0yp-legacy-and-root-legacy.drv
+
+  legacy-only /nix/store/v82py7bn05r1zlvgc3plj6gpp5m4ha6l-legacy-only.drv
+  ==          /nix/store/v82py7bn05r1zlvgc3plj6gpp5m4ha6l-legacy-only.drv
+
+  pkgs-and-legacy /nix/store/j53clkfswjr868j6w2vg2y3gpkrsgsrq-pkgs-and-legacy-pkgs.drv
+  ==              /nix/store/j53clkfswjr868j6w2vg2y3gpkrsgsrq-pkgs-and-legacy-pkgs.drv
+
+  pkgs-only /nix/store/dy325ljvy3zs8wdzb6q771awf19n8bbx-pkgs-only.drv
+  ==        /nix/store/dy325ljvy3zs8wdzb6q771awf19n8bbx-pkgs-only.drv
+
+  root-only /nix/store/hx82fkckaclypdzzl8ywagn5syybarlm-root-only.drv
+  ==        /nix/store/hx82fkckaclypdzzl8ywagn5syybarlm-root-only.drv
+
+  .legacy-and-root /nix/store/mfpn2qcw5j9ssp0rslrwld2f7fx5iay6-legacy-and-root-root.drv
+  ==               /nix/store/mfpn2qcw5j9ssp0rslrwld2f7fx5iay6-legacy-and-root-root.drv
+"""
+stderr = ""
