@@ -81,7 +81,7 @@ impl Repository {
         let parent = match (revision, self.mode) {
             (Revision::Commit(Commit { commit_id, .. }), VcsMode::Git) => &format!("{commit_id}^"),
             (Revision::Commit(Commit { commit_id, .. }), VcsMode::Jujutsu) => {
-                &format!("exactly(first_parent(commit_id({commit_id})), 1)")
+                &format!("first_parent(commit_id({commit_id}))")
             }
             (Revision::GitWorkingTree, VcsMode::Git) => "HEAD",
             (Revision::GitWorkingTree, VcsMode::Jujutsu) => unreachable!(),
