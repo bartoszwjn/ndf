@@ -41,7 +41,8 @@ exit_code = 2
 stdout = ""
 stderr = """
 error:
-   0: "[working tree]" is not a valid Jujutsu revset
+   0: failed to resolve commit '--revision': "[working tree]"
+   1: "[working tree]" is not a valid Jujutsu revset
 
-Note: The Jujutsu equivalent of Git's working tree is the working copy commit (`@`). Use `--git` to switch to Git mode.
+Note: The Jujutsu equivalent of Git's working tree is the working copy commit (`@`). Use '--git' to switch to Git mode.
 """

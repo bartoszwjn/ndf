@@ -68,7 +68,7 @@ impl Repository {
             )
             .note(
                 "The Jujutsu equivalent of Git's working tree is the working copy commit (`@`). \
-                Use `--git` to switch to Git mode.",
+                Use '--git' to switch to Git mode.",
             )),
             VcsMode::Jujutsu => {
                 let (commit_id, display) = jj::resolve_and_show_commit(commit, self.root())?;

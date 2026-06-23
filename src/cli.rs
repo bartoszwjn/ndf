@@ -284,20 +284,34 @@ impl NdfApp {
         };
         match (&self.revision, &self.from, &self.to) {
             (revision, None, None) => {
-                let rev = revision.as_deref().unwrap_or(default_rev);
-                if self.base.is_none() {
-                    let to = repo.resolve_commit(rev)?;
-                    let from = repo.get_first_parent(&to)?;
-                    Ok((from, to))
+                let revision = revision.as_deref().unwrap_or(default_rev);
+
+                let to = repo.resolve_commit(revision).wrap_err_with(|| {
+                    format!("failed to resolve commit '--revision': {revision:?}")
+                })?;
+
+                let from = if self.base.is_none() {
+                    repo.get_first_parent(&to).wrap_err_with(|| {
+                        format!("failed to resolve parent commit of '--revision': {revision:?}")
+                    })?
                 } else {
-                    let from_and_to = repo.resolve_commit(rev)?;
-                    Ok((from_and_to.clone(), from_and_to))
-                }
+                    to.clone()
+                };
+
+                Ok((from, to))
             }
             (None, from, to) => {
                 let from = from.as_deref().unwrap_or(default_rev);
+                let from = repo
+                    .resolve_commit(from)
+                    .wrap_err_with(|| format!("failed to resolve commit '--from': {from:?}"))?;
+
                 let to = to.as_deref().unwrap_or(default_rev);
-                Ok((repo.resolve_commit(from)?, repo.resolve_commit(to)?))
+                let to = repo
+                    .resolve_commit(to)
+                    .wrap_err_with(|| format!("failed to resolve commit '--to': {to:?}"))?;
+
+                Ok((from, to))
             }
             (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
                 unreachable!("--revision is mutually exclusive with --from and --to")
