@@ -89,12 +89,13 @@ pub struct NdfApp {
 
     /// Interpret paths as attribute paths pointing to NixOS configurations.
     ///
-    /// When this flag is present:
-    /// - Each `<ATTR_PATH>` is treated as if `.config.system.build.toplevel` was appended to it.
-    /// - Flake output attribute paths without a leading dot are interpreted as relative to
-    ///   the `nixosConfigurations` output.
-    /// - The default flake outputs that are compared are the elements of `nixosConfigurations`.
-    #[arg(long, verbatim_doc_comment)]
+    /// When this flag is present
+    /// `config.system.build.toplevel` is automatically appended to all compared attribute paths.
+    ///
+    /// Additionally, attribute paths that select flake outputs
+    /// are interpreted as relative to the `nixosConfigurations` prefix
+    /// (except for those that start with a dot).
+    #[arg(long)]
     nixos: bool,
 
     /// Interpret each `<ATTR_PATH>` as a glob pattern.
@@ -113,25 +114,20 @@ pub struct NdfApp {
 
     /// Additional arguments passed to the tool that compares derivations.
     ///
-    /// The default value depends on the tool:
-    /// - `nix-diff`: `["--skip-already-compared", "--character-oriented"]`
+    /// The default value depends on the tool.
+    /// For `nix-diff` it's `--skip-already-compared --character-oriented`.
     ///
-    /// Note on parsing: after encountering `--tool-extra-args` all further arguments
-    /// will be treated as values for this option, until an optional end marker value `;`.
+    /// Note on parsing: after encountering `--tool-extra-args`
+    /// all further arguments will be treated as values for this option,
+    /// until an optional end marker value `;`.
     ///
-    /// When mixing this option with other options, either:
-    /// - specify `--tool-extra-args` last,
-    /// - use `;` to mark where values for `--tool-extra-args` end,
-    /// - use `--tool-extra-args=<value>` to pass one value at a time (can be repeated).
+    /// When mixing this option with other options,
+    /// either specify `--tool-extra-args` last,
+    /// use `;` to mark where values for `--tool-extra-args` end,
+    /// or use `--tool-extra-args=<value>` to pass one value at a time (can be repeated).
     ///
     /// In most shells the `;` argument needs to be quoted.
-    #[arg(
-        long,
-        num_args = 0..,
-        allow_hyphen_values = true,
-        value_terminator = ";",
-        verbatim_doc_comment,
-    )]
+    #[arg(long, num_args = 0.., allow_hyphen_values = true, value_terminator = ";")]
     tool_extra_args: Option<Vec<String>>,
 
     /// Use Git to parse and display revisions (Git mode).
