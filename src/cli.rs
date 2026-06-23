@@ -20,15 +20,52 @@ const AFTER_HELP: &str = "\
 ";
 
 /// Compare Nix derivations between two revisions.
+///
+/// Given a Nix flake or a file containing a Nix expression located inside a Git worktree,
+/// a set of output attributes, and two commits,
+/// show the derivation paths that each output attribute evaluates to in each commit,
+/// and whether the derivation paths differ between commits.
 #[derive(clap::Parser, Debug)]
 #[command(version, after_help(AFTER_HELP), max_term_width(100))]
 pub struct NdfApp {
     /// Attribute paths to compare.
     ///
-    /// Each path is compared between revisions specified with `-r`, or `-f` and `-t`.
+    /// If no attribute paths are provided, then the default is
+    /// the union of output attributes that exist in either of the two compared revisions.
+    /// For flakes the output attributes are all elements of `packages.<system>`
+    /// (or `nixosConfigurations`, if the `--nixos` flag was used).
+    /// For files the output attributes are all elements of the top-level attribute set
+    /// that the file evaluates to.
     ///
-    /// By default, these paths are interpreted as flake output attributes
-    /// of the flake in the current working directory.
+    /// Each attribute path is a sequence of attribute names separated by dots.
+    /// Attribute paths that select flake outputs can begin with a dot,
+    /// in that case they are interpreted as relative to the empty prefix
+    /// instead of whichever of the default prefixes matches first
+    /// (`packages.<system>`, `legacyPackages.<system>`, and empty prefix).
+    /// Apart from that, leading and trailing dots are not allowed.
+    ///
+    /// Inside an attribute name any character other than `.` and `"` can be written literally.
+    /// `"` begins a sequence of characters that lasts until the next `"`.
+    /// All characters in that sequence, excluding the opening and closing `"`,
+    /// are treated as part of the current attribute name.
+    /// This makes it possible for attribute names to contain `.`.
+    /// This is mostly consistent with how the Nix CLI parses attribute paths
+    /// in flake references and the `-A`/`--attr` option.
+    ///
+    /// Note that `"` can be used to quote only a part of an attribute name,
+    /// similar to how quoting works in Bash.
+    /// For example, both `"ab.cd"` and `a"b.c"d` are equivalent,
+    /// and represent an attribute path with one component: `ab.cd`.
+    ///
+    /// Empty attribute names must be quoted.
+    /// That way the value `` (an empty string) represents an attribute path with no components,
+    /// and `""` represents an attribute path with an empty string as the only component.
+    ///
+    /// Attribute names containing the `"` character cannot be expressed using this syntax.
+    /// However, attribute paths containing such names can still be compared
+    /// if they are part of the default set of compared attribute paths.
+    /// It is also possible to match the `"` character explicitly using glob patterns,
+    /// see the description of the `--glob` flag for details.
     #[arg(value_name = "ATTR_PATH")]
     attr_paths: Vec<String>,
 
@@ -99,6 +136,38 @@ pub struct NdfApp {
     nixos: bool,
 
     /// Interpret each `<ATTR_PATH>` as a glob pattern.
+    ///
+    /// Each pattern is matched against existing output attributes in both compared revisions.
+    /// The union of all matches is then used as the set of attribute paths to compare.
+    ///
+    /// The syntax of glob patterns is the same as that of regular attribute paths,
+    /// except that `?`, `*`, and `[` characters now have a special meaning inside attribute names.
+    /// `?` matches any single character,
+    /// `*` matches any string (including an empty string),
+    /// and `[` begins a bracket expression,
+    /// which matches any one of the characters enclosed between the brackets.
+    /// Bracket expressions work the same as in extended POSIX regular expressions
+    /// (the flavor of regular expressions used by Nix's `builtins.match`),
+    /// except that the expression can be inverted by following the initial `[`
+    /// with either `^` or `!` (matching Bash syntax for bracket expressions).
+    ///
+    /// `"` can be used to remove any special meaning from all characters between the quotes.
+    /// For example, `"*"` matches only one character, the literal `*`.
+    /// `"` can appear inside a bracket expression,
+    /// in that case it becomes one of the characters matched by that bracket expression.
+    ///
+    /// Like regular attribute paths, glob patterns are sequences of subpatterns separated by dots.
+    /// For an attribute path to match the full pattern,
+    /// each subpattern has to match a single attribute name.
+    /// For example, `*.*` is a pattern with two components,
+    /// which means it can only match attribute paths with exactly two components.
+    ///
+    /// Like regular attribute paths,
+    /// glob patterns that select flake outputs and don't start with a dot
+    /// are interpreted as relative to one of the default prefixes
+    /// (`packages.<system>`, `legacyPackages.<system>`, and empty prefix).
+    /// When computing the set of attribute paths matching such a pattern,
+    /// the first prefix that produces a non-empty set of matches determines the result.
     #[arg(long, short = 'g')]
     glob: bool,
 
