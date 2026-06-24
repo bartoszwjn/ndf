@@ -78,6 +78,7 @@ test_cases!(
     glob_flake,
     glob_flake_nixos_output_lookup,
     glob_flake_output_lookup,
+    glob_outputs_sorting,
     glob_outputs_union,
     jj_file_basic,
     jj_flake_basic,
