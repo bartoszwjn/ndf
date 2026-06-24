@@ -1,11 +1,11 @@
-use std::{fmt, iter};
+use std::{cmp::Ordering, fmt, iter};
 
-use crate::source::Source;
+use crate::{natural_ord::NaturalOrdStr, source::Source};
 
 #[cfg(test)]
 mod tests;
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct AttrPath {
     leading_dot: bool,
     parts: Vec<String>,
@@ -163,6 +163,23 @@ impl AttrPath {
         }
 
         Ok(Self::new(leading_dot, parts, false))
+    }
+}
+
+impl Ord for AttrPath {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.leading_dot.cmp(&other.leading_dot))
+            .then_with(|| {
+                (self.parts.iter().map(|s| NaturalOrdStr(s)))
+                    .cmp(other.parts.iter().map(|s| NaturalOrdStr(s)))
+            })
+            .then(self.nixos.cmp(&other.nixos))
+    }
+}
+
+impl PartialOrd for AttrPath {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

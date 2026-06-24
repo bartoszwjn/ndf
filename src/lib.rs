@@ -6,6 +6,7 @@ mod diff_spec;
 mod display;
 mod eval;
 mod glob;
+mod natural_ord;
 mod nix;
 mod source;
 mod styles;
