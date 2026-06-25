@@ -410,13 +410,7 @@ fn get_attr_paths(
     glob: bool,
 ) -> eyre::Result<Vec<AttrPath>> {
     if attr_paths.is_empty() {
-        let names =
-            get_default_attr_names(spec).wrap_err("failed to determine default attribute paths")?;
-        let paths = names
-            .into_iter()
-            .map(|name| AttrPath::new(false, vec![name], spec.nixos))
-            .collect();
-        Ok(paths)
+        get_default_output_attrs(spec).wrap_err("failed to determine default attribute paths")
     } else if glob {
         let patterns = attr_paths
             .iter()
@@ -426,8 +420,9 @@ fn get_attr_paths(
             })
             .collect::<Result<Vec<_>, _>>()?;
         get_matching_output_attrs(spec, &patterns)
+            .wrap_err("failed to determine attribute paths that match provided glob patterns")
     } else {
-        // In the other branches Nix fetches the sources when computing attr names.
+        // In the other branches Nix fetches the sources when computing attr paths.
         prefetch_sources(spec)?;
         attr_paths
             .iter()
@@ -439,26 +434,26 @@ fn get_attr_paths(
     }
 }
 
-fn get_default_attr_names(spec: PartialSpec) -> eyre::Result<Vec<String>> {
+fn get_default_output_attrs(spec: PartialSpec) -> eyre::Result<Vec<AttrPath>> {
     let from_commit = spec.from.commit_id();
     let to_commit = spec.to.commit_id();
 
     let get_for_commit = |commit_id| match spec.source {
         Source::Flake(flake_path) => {
-            nix::get_flake_output_names(flake_path, commit_id, spec.nixos, spec.impure)
+            nix::get_default_flake_outputs(flake_path, commit_id, spec.nixos, spec.impure)
         }
         Source::File(file_path) => {
-            nix::get_file_output_names(spec.repo.root(), file_path, commit_id)
+            nix::get_default_file_outputs(spec.repo.root(), file_path, commit_id, spec.nixos)
         }
     };
 
-    let mut names = get_for_commit(from_commit)?;
+    let mut attr_paths = get_for_commit(from_commit)?;
     if from_commit != to_commit {
-        names.extend(get_for_commit(to_commit)?);
-        names.sort();
-        names.dedup();
+        attr_paths.extend(get_for_commit(to_commit)?);
+        attr_paths.sort();
+        attr_paths.dedup();
     }
-    Ok(names)
+    Ok(attr_paths)
 }
 
 fn get_matching_output_attrs(

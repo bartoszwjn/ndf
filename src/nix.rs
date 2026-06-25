@@ -63,12 +63,12 @@ fn get_current_system() -> eyre::Result<String> {
     }
 }
 
-pub(crate) fn get_flake_output_names(
+pub(crate) fn get_default_flake_outputs(
     flake_path: &FlakePath,
     commit_id: Option<&str>,
     nixos: bool,
     impure: bool,
-) -> eyre::Result<Vec<String>> {
+) -> eyre::Result<Vec<AttrPath>> {
     let apply_expr = if nixos {
         "flake: builtins.attrNames (flake.nixosConfigurations or { })"
     } else {
@@ -77,23 +77,32 @@ pub(crate) fn get_flake_output_names(
         &format!("flake: builtins.attrNames (flake.packages.{system} or {{ }})")
     };
 
-    nix_eval_json(impure)
+    let output = nix_eval_json(impure)
         .args(["--apply", apply_expr])
         .args(["--", &make_flake_root_output(flake_path, commit_id)])
-        .output_json()
+        .output_json::<Vec<String>>()?;
+
+    Ok(map_vec(output, |name| {
+        AttrPath::new(false, vec![name], nixos)
+    }))
 }
 
-pub(crate) fn get_file_output_names(
+pub(crate) fn get_default_file_outputs(
     repo_root: &Path,
     file_path: &Path,
     commit_id: Option<&str>,
-) -> eyre::Result<Vec<String>> {
-    nix_instantiate_eval_json()
+    nixos: bool,
+) -> eyre::Result<Vec<AttrPath>> {
+    let output = nix_instantiate_eval_json()
         .args(["--expr", include_str!("nix/get-file-output-attributes.nix")])
         .nix_argstr("repoRoot", repo_root)
         .nix_argstr("pathInRepo", make_path_in_repo(repo_root, file_path))
         .nix_argstr_nullable("rev", commit_id)
-        .output_json()
+        .output_json::<Vec<String>>()?;
+
+    Ok(map_vec(output, |name| {
+        AttrPath::new(false, vec![name], nixos)
+    }))
 }
 
 pub(crate) fn get_matching_flake_outputs(
