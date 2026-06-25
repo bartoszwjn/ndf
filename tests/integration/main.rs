@@ -47,6 +47,7 @@ test_cases!(
     file_weird_names,
     file_with_base,
     flake_basic,
+    flake_default_outputs_sorting,
     flake_different_outputs_auto_select,
     flake_different_outputs_manual_select,
     flake_empty_attr_path,
