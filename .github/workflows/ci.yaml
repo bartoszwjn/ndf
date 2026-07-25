@@ -30,10 +30,10 @@ jobs:
     runs-on: ${{ matrix.os.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Nix
-        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
         with:
           extra_nix_config: |
             allow-import-from-derivation = false
@@ -86,10 +86,10 @@ jobs:
       LIX_VERSION: "2.95.2"
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install CppNix
-        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
         if: ${{ matrix.nix == 'CppNix' }}
         with:
           install_url: https://releases.nixos.org/nix/nix-${{ env.CPPNIX_VERSION }}/install
@@ -97,7 +97,7 @@ jobs:
             experimental-features =
 
       - name: Cache Lix installer
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: ${{ matrix.nix == 'Lix' }}
         with:
           key: lix-installer-${{ env.LIX_VERSION }}-${{ matrix.os.nix_system }}
@@ -169,7 +169,7 @@ jobs:
         run: cargo version --verbose
 
       - name: Cache Cargo artifacts
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.toml', 'Cargo.lock') }}
           path: |
